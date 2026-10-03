@@ -10,4 +10,4 @@ BetterSelf is a goal-pursuit application that helps users turn broad goals into 
 
 My design notebook and personal reflections are kept in my private individual repository:
 
-[Design Notebook](https://github.com/al1sah1l/6.1040-fall26/reflections/design-notebook.md](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md)
+[Design Notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md)
