@@ -127,6 +127,27 @@ Defined in [ProofVerifying](../design/concepts/ProofVerifying.md), line 1.
   - `Goal` is `GoalPlanning.Goal` — [BetterSelf Types and Instances](../design/types.md), line 24.
   - `User` is `Person` — [BetterSelf Types and Instances](../design/types.md), line 23.
 
+### Sessioning
+
+Defined in [Sessioning](../design/concepts/Sessioning.md), line 1.
+
+#### Actions
+
+- `start(subject: Subject) : returns (session: Session, expiresAt: DateTime)`
+- `current(session: Session) : returns (subject: Subject)`
+  - Refuses `UNKNOWN_SESSION`: This session is not active.
+- `end(session: Session) : returns (ended: Flag)`
+  - Refuses `UNKNOWN_SESSION`: This session is not active.
+
+#### Queries
+
+- `_active(session: Session) : optional (subject: Subject, expiresAt: DateTime)`
+
+#### Instances
+
+- `Sessioning` — instance of `Sessioning` — [BetterSelf Types and Instances](../design/types.md), line 33.
+  - `Subject` is `Person` — [BetterSelf Types and Instances](../design/types.md), line 34.
+
 ## Application types
 
 Concrete types:
@@ -160,57 +181,71 @@ then
   AccountabilityGrouping.shareProof (goal, proof)
 ```
 
-### BetterSelf.verification.ReviewProof:authorized
+### BetterSelf.verification.ReviewProof
 
 Authored path: `BetterSelf.verification.ReviewProof`.
 - Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
-- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 16.
 
 ```reaction
-when RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
-where
-  ProofVerifying._proof (proof) has (goal)
+when RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, session)
 then
-  AccountabilityGrouping.checkMember (goal, user: reviewer)
+  Sessioning.current (session)
 ```
 
 ### BetterSelf.verification.ReviewProof:authorized#2
 
 Authored path: `BetterSelf.verification.ReviewProof`.
 - Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
-- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 16.
 
 ```reaction
-when AccountabilityGrouping.checkMember (goal, user: reviewer), asked by BetterSelf.verification.ReviewProof:authorized
+when Sessioning.current (session, subject: reviewer), asked by BetterSelf.verification.ReviewProof
 where
-  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, session)
+  ProofVerifying._proof (proof) has (goal)
 then
-  ProofVerifying.reviewProof (decision, note, proof, reviewer)
+  AccountabilityGrouping.checkMember (goal, user: reviewer)
 ```
 
 ### BetterSelf.verification.ReviewProof:authorized#3
 
 Authored path: `BetterSelf.verification.ReviewProof`.
 - Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
-- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 16.
 
 ```reaction
-when ProofVerifying.reviewProof (decision, note, proof, reviewer), asked by BetterSelf.verification.ReviewProof:authorized#2
+when AccountabilityGrouping.checkMember (goal, user: reviewer), asked by BetterSelf.verification.ReviewProof:authorized#2
 where
-  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, session)
+then
+  ProofVerifying.reviewProof (decision, note, proof, reviewer)
+```
+
+### BetterSelf.verification.ReviewProof:authorized#4
+
+Authored path: `BetterSelf.verification.ReviewProof`.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 16.
+
+```reaction
+when ProofVerifying.reviewProof (decision, note, proof, reviewer), asked by BetterSelf.verification.ReviewProof:authorized#3
+where
+  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, session)
 then
   RequestBoundary.respond (proof, requestId)
 ```
 
-### BetterSelf.verification.ReviewProof:missing
+### BetterSelf.verification.ReviewProof:missing#2
 
 Authored path: `BetterSelf.verification.ReviewProof`.
 - Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
-- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 16.
 
 ```reaction
-when RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+when Sessioning.current (session, subject: reviewer), asked by BetterSelf.verification.ReviewProof
 where
+  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, session)
   no ProofVerifying._proof (proof)
 then
   RequestBoundary.respond (error: "PROOF_NOT_FOUND", requestId)
@@ -243,4 +278,4 @@ object or lacks a required key. The response uses `INVALID_INPUT` and names
 the path or missing key. A declared default fills an absent key. Endpoints
 not listed here have no explicit input contract.
 
-- `/proofs/review` — requires `reviewer`, `proof`, `decision`, `note`
+- `/proofs/review` — requires `session`, `proof`, `decision`, `note`

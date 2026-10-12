@@ -4,12 +4,14 @@ import { goalPlanning } from "./concepts/GoalPlanning/GoalPlanning.registry.ts";
 import { commitmentTracking } from "./concepts/CommitmentTracking/CommitmentTracking.registry.ts";
 import { proofVerifying } from "./concepts/ProofVerifying/ProofVerifying.registry.ts";
 import { accountabilityGrouping } from "./concepts/AccountabilityGrouping/AccountabilityGrouping.registry.ts";
+import { sessioning } from "./concepts/Sessioning/Sessioning.registry.ts";
 
 export const applicationConceptSet = conceptSet({
   GoalPlanning: goalPlanning,
   CommitmentTracking: commitmentTracking,
   ProofVerifying: proofVerifying,
   AccountabilityGrouping: accountabilityGrouping,
+  Sessioning: sessioning,
 });
 
 export const { concepts } = applicationConceptSet;

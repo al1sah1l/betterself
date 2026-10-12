@@ -16,11 +16,11 @@ export type ApplicationWire = {
       "decision": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["decision"]>>;
       "note": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["note"]>>;
       "proof": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>[0], ["proof"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["proof"]>]>>;
-      "reviewer": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["checkMember"]>[0], ["user"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["reviewer"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
     };
     output: {
       "proof": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["proof"]>>;
     };
-    error: { error: AppWideError | "CANNOT_REVIEW_OWN_PROOF" | "GOAL_NOT_ATTACHED" | "INVALID_INPUT" | "NOT_GROUP_MEMBER" | "PROOF_ALREADY_REVIEWED" | "PROOF_NOT_FOUND" };
+    error: { error: AppWideError | "CANNOT_REVIEW_OWN_PROOF" | "GOAL_NOT_ATTACHED" | "INVALID_INPUT" | "NOT_GROUP_MEMBER" | "PROOF_ALREADY_REVIEWED" | "PROOF_NOT_FOUND" | "UNKNOWN_SESSION" };
   };
 };

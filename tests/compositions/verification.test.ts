@@ -43,6 +43,27 @@ function assembleTestApplication() {
   });
 }
 
+async function createSession(
+  app: ReturnType<typeof assembleTestApplication>,
+  subject: string,
+) {
+  const started =
+    await app.concepts.Sessioning.start({
+      subject,
+    });
+
+  if (
+    typeof started !== "object" ||
+    started === null ||
+    !("session" in started) ||
+    typeof started.session !== "string"
+  ) {
+    throw new Error("Could not create session.");
+  }
+
+  return started.session;
+}
+
 async function createGroup(
   app: ReturnType<typeof assembleTestApplication>,
 ) {
@@ -89,7 +110,7 @@ async function createProof(
   return submitted.proof;
 }
 
-test("group member can review proof", async () => {
+test("authenticated group member can review proof", async () => {
   const app = assembleTestApplication();
 
   const group = await createGroup(app);
@@ -106,9 +127,10 @@ test("group member can review proof", async () => {
   });
 
   const proof = await createProof(app);
+  const session = await createSession(app, "alex");
 
   await app.invoker.invoke("/proofs/review", {
-    reviewer: "alex",
+    session,
     proof,
     decision: "verified",
     note: "Evidence supports the completion.",
@@ -130,7 +152,7 @@ test("group member can review proof", async () => {
   });
 });
 
-test("non-member cannot review proof", async () => {
+test("authenticated non-member cannot review proof", async () => {
   const app = assembleTestApplication();
 
   const group = await createGroup(app);
@@ -142,11 +164,12 @@ test("non-member cannot review proof", async () => {
   });
 
   const proof = await createProof(app);
+  const session = await createSession(app, "sam");
 
   await app.invoker.invoke(
     "/proofs/review",
     {
-      reviewer: "sam",
+      session,
       proof,
       decision: "verified",
       note: "Trying to review without membership.",
@@ -166,7 +189,51 @@ test("non-member cannot review proof", async () => {
   expect(reviews).toEqual([]);
 });
 
-test("endpoint derives goal from proof instead of accepting one from client", async () => {
+test("client cannot spoof reviewer identity", async () => {
+  const app = assembleTestApplication();
+
+  const group = await createGroup(app);
+
+  await app.concepts.AccountabilityGrouping.joinGroup({
+    group,
+    user: "alex",
+  });
+
+  await app.concepts.AccountabilityGrouping.attachGoal({
+    group,
+    user: "maya",
+    goal: "goal-1",
+  });
+
+  const proof = await createProof(app);
+  const session = await createSession(app, "alex");
+
+  await app.invoker.invoke("/proofs/review", {
+    session,
+    proof,
+    decision: "verified",
+    note: "Reviewed using authenticated identity",
+
+    // The endpoint does not receive this field.
+    reviewer: "sam",
+  });
+
+  await app.whenIdle();
+
+  const reviews =
+    await app.concepts.ProofVerifying._verificationsByProof({
+      proof,
+    });
+
+  expect(reviews).toHaveLength(1);
+
+  expect(reviews[0]).toMatchObject({
+    reviewer: "alex",
+    decision: "verified",
+  });
+});
+
+test("invalid session cannot create a verification", async () => {
   const app = assembleTestApplication();
 
   const group = await createGroup(app);
@@ -184,16 +251,18 @@ test("endpoint derives goal from proof instead of accepting one from client", as
 
   const proof = await createProof(app);
 
-  await app.invoker.invoke("/proofs/review", {
-    reviewer: "alex",
-    proof,
-    decision: "disputed",
-    note: "This needs clarification.",
-
-    // This should have no effect because the endpoint
-    // derives the real goal from the proof.
-    goal: "fake-goal",
-  });
+  await app.invoker.invoke(
+    "/proofs/review",
+    {
+      session: "invalid-session",
+      proof,
+      decision: "verified",
+      note: "Should not be recorded.",
+    },
+    {
+      timeoutMs: 1000,
+    },
+  );
 
   await app.whenIdle();
 
@@ -202,19 +271,16 @@ test("endpoint derives goal from proof instead of accepting one from client", as
       proof,
     });
 
-  expect(reviews).toHaveLength(1);
-
-  expect(reviews[0]).toMatchObject({
-    reviewer: "alex",
-    decision: "disputed",
-  });
+  expect(reviews).toEqual([]);
 });
 
 test("missing proof does not create a verification", async () => {
   const app = assembleTestApplication();
 
+  const session = await createSession(app, "alex");
+
   await app.invoker.invoke("/proofs/review", {
-    reviewer: "alex",
+    session,
     proof: "missing-proof",
     decision: "verified",
     note: "Should not be recorded.",

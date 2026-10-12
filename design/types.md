@@ -29,4 +29,7 @@ instantiate AccountabilityGrouping with
   User is Person
   Goal is GoalPlanning.Goal
   Proof is ProofVerifying.Proof
+
+instantiate Sessioning with
+  Subject is Person
 ```
