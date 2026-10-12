@@ -103,4 +103,17 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "CANNOT_REVIEW_OWN_PROOF" | "GOAL_NOT_ATTACHED" | "INVALID_INPUT" | "NOT_GROUP_MEMBER" | "PROOF_ALREADY_REVIEWED" | "PROOF_NOT_FOUND" | "UNKNOWN_SESSION" };
   };
+  "/proofs/submit": {
+    input: {
+      "commitment": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["commitment"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitment"]>[0], ["commitment"]>]>>;
+      "evidence": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["evidence"]>>;
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "occurrence": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["occurrence"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "proof": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>>, ["proof"]>>;
+    };
+    error: { error: AppWideError | "COMMITMENT_GOAL_MISMATCH" | "COMMITMENT_NOT_FOUND" | "COMMITMENT_RETIRED" | "COMPLETION_ALREADY_CLAIMED" | "EVIDENCE_REQUIRED" | "FORBIDDEN" | "GOAL_NOT_ATTACHED" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "ONE_TIME_ALREADY_COMPLETED" | "PROOF_ALREADY_SHARED" | "PROOF_ALREADY_SUBMITTED" | "UNKNOWN_SESSION" };
+  };
 };

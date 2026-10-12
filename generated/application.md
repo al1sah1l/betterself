@@ -513,6 +513,112 @@ then
   AccountabilityGrouping.shareProof (goal, proof)
 ```
 
+### BetterSelf.proofs.SubmitProof
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.proofs.SubmitProof:authorized#2
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
+where
+  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+  CommitmentTracking._commitment (commitment) has (goal)
+then
+  ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user)
+```
+
+### BetterSelf.proofs.SubmitProof:authorized#3
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user, proof), asked by BetterSelf.proofs.SubmitProof:authorized#2
+where
+  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+then
+  RequestBoundary.respond (proof, requestId)
+```
+
+### BetterSelf.proofs.SubmitProof:forbiddenGoal#2
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
+where
+  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.proofs.SubmitProof:missingCommitment#2
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
+where
+  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+  no CommitmentTracking._commitment (commitment)
+then
+  RequestBoundary.respond (error: "COMMITMENT_NOT_FOUND", requestId)
+```
+
+### BetterSelf.proofs.SubmitProof:missingGoal#2
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
+where
+  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.proofs.SubmitProof:wrongGoal#2
+
+Authored path: `BetterSelf.proofs.SubmitProof`.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
+- Covered by [Proof Submission](../design/compositions/proofs.md), line 16.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
+where
+  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+  CommitmentTracking._commitment (commitment)
+  no CommitmentTracking._commitment (commitment) has (goal)
+then
+  RequestBoundary.respond (error: "COMMITMENT_GOAL_MISMATCH", requestId)
+```
+
 ### BetterSelf.verification.ReviewProof
 
 Authored path: `BetterSelf.verification.ReviewProof`.
@@ -618,3 +724,4 @@ not listed here have no explicit input contract.
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`
+- `/proofs/submit` — requires `session`, `goal`, `commitment`, `occurrence`, `evidence`

@@ -15,6 +15,7 @@ import {
 } from "./compositions/goals.ts";
 
 import {CreateCommitment} from "./compositions/commitments.ts";
+import { SubmitProof } from "./compositions/proofs.ts";
 
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
 import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
@@ -48,6 +49,10 @@ export function assembleApplication() {
 
         commitments: {
           CreateCommitment,
+        },
+
+        proofs: {
+          SubmitProof,
         },
 
         completion: {
