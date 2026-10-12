@@ -1,0 +1,90 @@
+# ProofVerifying
+
+## Purpose
+
+Require evidence for claimed execution and allow other users to verify whether submitted evidence supports the claimed completion.
+
+## Principle
+
+When a user completes an occurrence of a commitment, they submit evidence for it. Other users can review the proof and mark it as verified or disputed. Peer verification is stored separately from the submitter's own completion claim.
+
+## Types
+
+```types
+external User
+  A user who submits or reviews proof.
+
+external Goal
+  The goal associated with the proof.
+
+external Commitment
+  The commitment associated with the proof.
+
+external Evidence
+  The evidence submitted for a commitment occurrence.
+
+opaque VerificationDecision
+  A review decision, either verified or disputed.
+```
+
+## State
+
+```state
+a set of Proofs with
+  a submitter User
+  a goal Goal
+  a commitment Commitment
+  an occurrence DateTime
+  an evidence Evidence
+  a createdAt DateTime
+  unique commitment and occurrence
+
+a set of Verifications with
+  a proof Proof
+  a reviewer User
+  a decision VerificationDecision
+  a note String
+  a createdAt DateTime
+  unique proof and reviewer
+```
+
+## Actions
+
+```actions
+submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: Evidence) : returns (proof: Proof)
+  where no Proof has this commitment and occurrence
+  then
+    add a new Proof with submitter, goal, commitment, occurrence, evidence, and the current creation time
+    returns proof
+  where a Proof already has this commitment and occurrence
+  then
+    refuses PROOF_ALREADY_SUBMITTED "Proof has already been submitted for this occurrence."
+
+reviewProof(reviewer: User, proof: Proof, decision: VerificationDecision, note: String) : returns (proof: Proof)
+  where proof is in Proofs and the proof's submitter is not reviewer and no Verification has this proof and reviewer
+  then
+    add a new Verification with proof, reviewer, decision, note, and the current creation time
+    returns proof
+  where proof is not in Proofs
+  then
+    refuses PROOF_NOT_FOUND "There is no such proof."
+  where proof is in Proofs and the proof's submitter is reviewer
+  then
+    refuses CANNOT_REVIEW_OWN_PROOF "A user cannot review their own proof."
+  where proof is in Proofs and a Verification already has this proof and reviewer
+  then
+    refuses PROOF_ALREADY_REVIEWED "This user has already reviewed this proof."
+```
+
+## Queries
+
+```queries
+_proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: Evidence)
+  Returns the proof's fields, or no row when the proof does not exist.
+
+_proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: Evidence)
+  Returns the proof submitted for this commitment occurrence, or no row when no proof has been submitted.
+
+_verificationsByProof(proof: Proof) : many (reviewer: User, decision: VerificationDecision, note: String)
+  Returns all peer verifications for this proof in creation order, or no rows when the proof has not been reviewed.
+```
