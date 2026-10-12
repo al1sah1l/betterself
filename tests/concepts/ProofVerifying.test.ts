@@ -42,7 +42,13 @@ async function createProof({
   goal = "goal-1",
   commitment = "commitment-1",
   occurrence = new Date("2026-10-19T12:00:00Z"),
-  evidence = "Screenshot showing completed applications",
+  evidence = ["Screenshot showing completed applications"],
+}: {
+  submitter?: string;
+  goal?: string;
+  commitment?: string;
+  occurrence?: Date;
+  evidence?: string[];
 } = {}) {
   return proofs.submitProof({
     submitter,
@@ -54,12 +60,9 @@ async function createProof({
 }
 
 test("a proof can be submitted and retrieved", async () => {
-  const occurrence =
-    new Date("2026-10-19T12:00:00Z");
+  const occurrence = new Date("2026-10-19T12:00:00Z");
 
-  const { proof } = await createProof({
-    occurrence,
-  });
+  const { proof } = await createProof({ occurrence });
 
   const rows = await proofs._proof({ proof });
 
@@ -68,8 +71,33 @@ test("a proof can be submitted and retrieved", async () => {
   expect(rows[0]?.goal).toBe("goal-1");
   expect(rows[0]?.commitment).toBe("commitment-1");
   expect(rows[0]?.occurrence).toEqual(occurrence);
-  expect(rows[0]?.evidence).toBe(
+  expect(rows[0]?.evidence).toEqual([
     "Screenshot showing completed applications",
+  ]);
+});
+
+test("a proof can contain multiple pieces of evidence", async () => {
+  const evidence = [
+    "Screenshot of email 1",
+    "Screenshot of email 2",
+    "Screenshot of email 3",
+    "Screenshot of email 4",
+    "Screenshot of email 5",
+  ];
+
+  const { proof } = await createProof({ evidence });
+
+  const rows = await proofs._proof({ proof });
+
+  expect(rows).toHaveLength(1);
+  expect(rows[0]?.evidence).toEqual(evidence);
+});
+
+test("a proof requires at least one piece of evidence", async () => {
+  await expect(
+    createProof({ evidence: [] }),
+  ).rejects.toThrow(
+    "At least one piece of evidence is required.",
   );
 });
 
@@ -82,8 +110,7 @@ test("a missing proof returns no row", async () => {
 });
 
 test("a proof can be found by commitment and occurrence", async () => {
-  const occurrence =
-    new Date("2026-10-19T12:00:00Z");
+  const occurrence = new Date("2026-10-19T12:00:00Z");
 
   const { proof } = await createProof({
     commitment: "commitment-1",
@@ -93,7 +120,7 @@ test("a proof can be found by commitment and occurrence", async () => {
   await createProof({
     commitment: "commitment-2",
     occurrence,
-    evidence: "Different evidence",
+    evidence: ["Different evidence"],
   });
 
   const rows = await proofs._proofForOccurrence({
@@ -107,19 +134,16 @@ test("a proof can be found by commitment and occurrence", async () => {
 });
 
 test("an occurrence without proof returns no row", async () => {
-  const rows =
-    await proofs._proofForOccurrence({
-      commitment: "commitment-1",
-      occurrence:
-        new Date("2026-10-19T12:00:00Z"),
-    });
+  const rows = await proofs._proofForOccurrence({
+    commitment: "commitment-1",
+    occurrence: new Date("2026-10-19T12:00:00Z"),
+  });
 
   expect(rows).toEqual([]);
 });
 
 test("proof cannot be submitted twice for the same commitment occurrence", async () => {
-  const occurrence =
-    new Date("2026-10-19T12:00:00Z");
+  const occurrence = new Date("2026-10-19T12:00:00Z");
 
   await createProof({
     commitment: "commitment-1",
@@ -132,7 +156,7 @@ test("proof cannot be submitted twice for the same commitment occurrence", async
       goal: "goal-1",
       commitment: "commitment-1",
       occurrence,
-      evidence: "Another proof",
+      evidence: ["Another proof"],
     }),
   ).rejects.toThrow(
     "Proof has already been submitted for this occurrence.",
@@ -140,8 +164,7 @@ test("proof cannot be submitted twice for the same commitment occurrence", async
 });
 
 test("only one simultaneous proof submission succeeds for the same occurrence", async () => {
-  const occurrence =
-    new Date("2026-10-19T12:00:00Z");
+  const occurrence = new Date("2026-10-19T12:00:00Z");
 
   const results = await Promise.allSettled([
     proofs.submitProof({
@@ -149,7 +172,7 @@ test("only one simultaneous proof submission succeeds for the same occurrence", 
       goal: "goal-1",
       commitment: "commitment-1",
       occurrence,
-      evidence: "Evidence A",
+      evidence: ["Evidence A"],
     }),
 
     proofs.submitProof({
@@ -157,7 +180,7 @@ test("only one simultaneous proof submission succeeds for the same occurrence", 
       goal: "goal-1",
       commitment: "commitment-1",
       occurrence,
-      evidence: "Evidence B",
+      evidence: ["Evidence B"],
     }),
   ]);
 
@@ -176,40 +199,31 @@ test("only one simultaneous proof submission succeeds for the same occurrence", 
 test("different occurrences of the same commitment can have different proofs", async () => {
   await createProof({
     commitment: "commitment-1",
-    occurrence:
-      new Date("2026-10-19T12:00:00Z"),
+    occurrence: new Date("2026-10-19T12:00:00Z"),
   });
 
   await createProof({
     commitment: "commitment-1",
-    occurrence:
-      new Date("2026-10-26T12:00:00Z"),
+    occurrence: new Date("2026-10-26T12:00:00Z"),
   });
 
-  const first =
-    await proofs._proofForOccurrence({
-      commitment: "commitment-1",
-      occurrence:
-        new Date("2026-10-19T12:00:00Z"),
-    });
+  const first = await proofs._proofForOccurrence({
+    commitment: "commitment-1",
+    occurrence: new Date("2026-10-19T12:00:00Z"),
+  });
 
-  const second =
-    await proofs._proofForOccurrence({
-      commitment: "commitment-1",
-      occurrence:
-        new Date("2026-10-26T12:00:00Z"),
-    });
+  const second = await proofs._proofForOccurrence({
+    commitment: "commitment-1",
+    occurrence: new Date("2026-10-26T12:00:00Z"),
+  });
 
   expect(first).toHaveLength(1);
   expect(second).toHaveLength(1);
-  expect(first[0]?.proof).not.toBe(
-    second[0]?.proof,
-  );
+  expect(first[0]?.proof).not.toBe(second[0]?.proof);
 });
 
 test("different commitments can have proof for the same occurrence", async () => {
-  const occurrence =
-    new Date("2026-10-19T12:00:00Z");
+  const occurrence = new Date("2026-10-19T12:00:00Z");
 
   await createProof({
     commitment: "commitment-1",
@@ -220,7 +234,7 @@ test("different commitments can have proof for the same occurrence", async () =>
     createProof({
       commitment: "commitment-2",
       occurrence,
-      evidence: "Second commitment evidence",
+      evidence: ["Second commitment evidence"],
     }),
   ).resolves.toHaveProperty("proof");
 });
@@ -235,10 +249,9 @@ test("another user can verify a proof", async () => {
     note: "Looks good.",
   });
 
-  const rows =
-    await proofs._verificationsByProof({
-      proof,
-    });
+  const rows = await proofs._verificationsByProof({
+    proof,
+  });
 
   expect(rows).toHaveLength(1);
   expect(rows[0]).toEqual({
@@ -258,10 +271,9 @@ test("a reviewer can dispute a proof", async () => {
     note: "The evidence does not show completion.",
   });
 
-  const rows =
-    await proofs._verificationsByProof({
-      proof,
-    });
+  const rows = await proofs._verificationsByProof({
+    proof,
+  });
 
   expect(rows).toHaveLength(1);
   expect(rows[0]?.decision).toBe("disputed");
@@ -367,10 +379,9 @@ test("different reviewers can review the same proof", async () => {
     note: "I disagree.",
   });
 
-  const rows =
-    await proofs._verificationsByProof({
-      proof,
-    });
+  const rows = await proofs._verificationsByProof({
+    proof,
+  });
 
   expect(rows).toHaveLength(2);
 
@@ -382,15 +393,13 @@ test("different reviewers can review the same proof", async () => {
 });
 
 test("verifications are returned only for the requested proof", async () => {
-  const { proof: firstProof } =
-    await createProof({
-      commitment: "commitment-1",
-    });
+  const { proof: firstProof } = await createProof({
+    commitment: "commitment-1",
+  });
 
-  const { proof: secondProof } =
-    await createProof({
-      commitment: "commitment-2",
-    });
+  const { proof: secondProof } = await createProof({
+    commitment: "commitment-2",
+  });
 
   await proofs.reviewProof({
     reviewer: "alex",
@@ -406,10 +415,9 @@ test("verifications are returned only for the requested proof", async () => {
     note: "Second proof review",
   });
 
-  const rows =
-    await proofs._verificationsByProof({
-      proof: firstProof,
-    });
+  const rows = await proofs._verificationsByProof({
+    proof: firstProof,
+  });
 
   expect(rows).toHaveLength(1);
   expect(rows[0]?.reviewer).toBe("alex");
@@ -418,10 +426,9 @@ test("verifications are returned only for the requested proof", async () => {
 test("a proof with no reviews gets an empty verification list", async () => {
   const { proof } = await createProof();
 
-  const rows =
-    await proofs._verificationsByProof({
-      proof,
-    });
+  const rows = await proofs._verificationsByProof({
+    proof,
+  });
 
   expect(rows).toEqual([]);
 });
@@ -448,10 +455,9 @@ test("verifications are returned in creation order", async () => {
     note: "Second review",
   });
 
-  const rows =
-    await proofs._verificationsByProof({
-      proof,
-    });
+  const rows = await proofs._verificationsByProof({
+    proof,
+  });
 
   expect(rows.map((row) => row.reviewer)).toEqual([
     "alex",

@@ -6,7 +6,7 @@ Require evidence for claimed execution and allow other users to verify whether s
 
 ## Principle
 
-When a user completes an occurrence of a commitment, they submit evidence for it. Other users can review the proof and mark it as verified or disputed. Peer verification is stored separately from the submitter's own completion claim.
+When a user completes an occurrence of a commitment, they submit one or more pieces of evidence for it. These pieces of evidence together form one proof for that commitment occurrence. Other users can review the proof and mark it as verified or disputed. Peer verification is stored separately from the submitter's own completion claim.
 
 ## Types
 
@@ -21,7 +21,10 @@ external Commitment
   The commitment associated with the proof.
 
 external Evidence
-  The evidence submitted for a commitment occurrence.
+  One piece of evidence submitted for a commitment occurrence.
+
+opaque EvidenceBundle
+  A collection of Evidence values supplied when submitting or reading a proof.
 
 opaque VerificationDecision
   A review decision, either verified or disputed.
@@ -35,7 +38,7 @@ a set of Proofs with
   a goal Goal
   a commitment Commitment
   an occurrence DateTime
-  an evidence Evidence
+  an evidence set of Evidence
   a createdAt DateTime
   unique commitment and occurrence
 
@@ -51,12 +54,15 @@ a set of Verifications with
 ## Actions
 
 ```actions
-submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: Evidence) : returns (proof: Proof)
-  where no Proof has this commitment and occurrence
+submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle) : returns (proof: Proof)
+  where evidence contains at least one Evidence and no Proof has this commitment and occurrence
   then
-    add a new Proof with submitter, goal, commitment, occurrence, evidence, and the current creation time
+    add a new Proof with submitter, goal, commitment, occurrence, all Evidence values in evidence, and the current creation time
     returns proof
-  where a Proof already has this commitment and occurrence
+  where evidence contains no Evidence
+  then
+    refuses EVIDENCE_REQUIRED "At least one piece of evidence is required."
+  where evidence contains at least one Evidence and a Proof already has this commitment and occurrence
   then
     refuses PROOF_ALREADY_SUBMITTED "Proof has already been submitted for this occurrence."
 
@@ -79,11 +85,11 @@ reviewProof(reviewer: User, proof: Proof, decision: VerificationDecision, note: 
 ## Queries
 
 ```queries
-_proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: Evidence)
-  Returns the proof's fields, or no row when the proof does not exist.
+_proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle)
+  Returns the proof's fields, including all evidence items, or no row when the proof does not exist.
 
-_proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: Evidence)
-  Returns the proof submitted for this commitment occurrence, or no row when no proof has been submitted.
+_proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: EvidenceBundle)
+  Returns the proof and all of its evidence items for this commitment occurrence, or no row when no proof has been submitted.
 
 _verificationsByProof(proof: Proof) : many (reviewer: User, decision: VerificationDecision, note: String)
   Returns all peer verifications for this proof in creation order, or no rows when the proof has not been reviewed.

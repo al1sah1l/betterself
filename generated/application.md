@@ -105,7 +105,8 @@ Defined in [ProofVerifying](../design/concepts/ProofVerifying.md), line 1.
 
 #### Actions
 
-- `submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: Evidence) : returns (proof: Proof)`
+- `submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle) : returns (proof: Proof)`
+  - Refuses `EVIDENCE_REQUIRED`: At least one piece of evidence is required.
   - Refuses `PROOF_ALREADY_SUBMITTED`: Proof has already been submitted for this occurrence.
 - `reviewProof(reviewer: User, proof: Proof, decision: VerificationDecision, note: String) : returns (proof: Proof)`
   - Refuses `PROOF_NOT_FOUND`: There is no such proof.
@@ -114,8 +115,8 @@ Defined in [ProofVerifying](../design/concepts/ProofVerifying.md), line 1.
 
 #### Queries
 
-- `_proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: Evidence)`
-- `_proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: Evidence)`
+- `_proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle)`
+- `_proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: EvidenceBundle)`
 - `_verificationsByProof(proof: Proof) : many (reviewer: User, decision: VerificationDecision, note: String)`
 
 #### Instances
