@@ -14,6 +14,8 @@ import {
   SetStrategy,
 } from "./compositions/goals.ts";
 
+import {CreateCommitment} from "./compositions/commitments.ts";
+
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
 import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
 import { ReviewProof } from "./compositions/verification.ts";
@@ -42,6 +44,10 @@ export function assembleApplication() {
         goals: {
           CreateGoal,
           SetStrategy,
+        },
+
+        commitments: {
+          CreateCommitment,
         },
 
         completion: {

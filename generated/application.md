@@ -305,6 +305,78 @@ then
   RequestBoundary.respond (requestId, signedOut)
 ```
 
+### BetterSelf.commitments.CreateCommitment
+
+Authored path: `BetterSelf.commitments.CreateCommitment`.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+
+```reaction
+when RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.commitments.CreateCommitment:authorized#2
+
+Authored path: `BetterSelf.commitments.CreateCommitment`.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.commitments.CreateCommitment
+where
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  CommitmentTracking.createCommitment (description, goal, recurring, schedule)
+```
+
+### BetterSelf.commitments.CreateCommitment:authorized#3
+
+Authored path: `BetterSelf.commitments.CreateCommitment`.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+
+```reaction
+when CommitmentTracking.createCommitment (description, goal, recurring, schedule, commitment), asked by BetterSelf.commitments.CreateCommitment:authorized#2
+where
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+then
+  RequestBoundary.respond (commitment, requestId)
+```
+
+### BetterSelf.commitments.CreateCommitment:forbidden#2
+
+Authored path: `BetterSelf.commitments.CreateCommitment`.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.commitments.CreateCommitment
+where
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.commitments.CreateCommitment:missing#2
+
+Authored path: `BetterSelf.commitments.CreateCommitment`.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.commitments.CreateCommitment
+where
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
 ### BetterSelf.completion.RecordCompletionFromProof
 
 Authored path: `BetterSelf.completion.RecordCompletionFromProof`.
@@ -542,6 +614,7 @@ not listed here have no explicit input contract.
 - `/auth/register` — requires `username`, `password`
 - `/auth/sign-in` — requires `username`, `password`
 - `/auth/sign-out` — requires `session`
+- `/commitments/create` — requires `session`, `goal`, `description`, `recurring`, `schedule`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`

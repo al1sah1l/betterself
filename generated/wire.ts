@@ -53,6 +53,19 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
   };
+  "/commitments/create": {
+    input: {
+      "description": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["description"]>>;
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "recurring": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["recurring"]>>;
+      "schedule": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["schedule"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "commitment": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>>, ["commitment"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
   "/goals/create": {
     input: {
       "constraints": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["createGoal"]>[0], ["constraints"]>>;
