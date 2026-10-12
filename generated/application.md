@@ -136,6 +136,17 @@ Concrete types:
 
 ## Reactions
 
+### BetterSelf.completion.RecordCompletionFromProof
+
+Authored path: `BetterSelf.completion.RecordCompletionFromProof`.
+- Covered by [Commitment Completion](../design/compositions/completion.md), line 3.
+
+```reaction
+when ProofVerifying.submitProof (commitment, occurrence)
+then
+  CommitmentTracking.claimComplete (commitment, occurrence)
+```
+
 ### DeliverFaultToAsker
 
 ```reaction
