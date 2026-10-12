@@ -160,6 +160,62 @@ then
   AccountabilityGrouping.shareProof (goal, proof)
 ```
 
+### BetterSelf.verification.ReviewProof:authorized
+
+Authored path: `BetterSelf.verification.ReviewProof`.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+
+```reaction
+when RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+where
+  ProofVerifying._proof (proof) has (goal)
+then
+  AccountabilityGrouping.checkMember (goal, user: reviewer)
+```
+
+### BetterSelf.verification.ReviewProof:authorized#2
+
+Authored path: `BetterSelf.verification.ReviewProof`.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+
+```reaction
+when AccountabilityGrouping.checkMember (goal, user: reviewer), asked by BetterSelf.verification.ReviewProof:authorized
+where
+  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+then
+  ProofVerifying.reviewProof (decision, note, proof, reviewer)
+```
+
+### BetterSelf.verification.ReviewProof:authorized#3
+
+Authored path: `BetterSelf.verification.ReviewProof`.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+
+```reaction
+when ProofVerifying.reviewProof (decision, note, proof, reviewer), asked by BetterSelf.verification.ReviewProof:authorized#2
+where
+  earlier, RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+then
+  RequestBoundary.respond (proof, requestId)
+```
+
+### BetterSelf.verification.ReviewProof:missing
+
+Authored path: `BetterSelf.verification.ReviewProof`.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 3.
+- Covered by [Proof Verification Access](../design/compositions/verification.md), line 12.
+
+```reaction
+when RequestBoundary.request (decision, note, path: "/proofs/review", proof, requestId, reviewer)
+where
+  no ProofVerifying._proof (proof)
+then
+  RequestBoundary.respond (error: "PROOF_NOT_FOUND", requestId)
+```
+
 ### DeliverFaultToAsker
 
 ```reaction
@@ -180,3 +236,11 @@ then
   RequestBoundary.respond (error: message, requestId)
 ```
 
+## Endpoint input contracts
+
+Before recording an action ask, the boundary rejects a body that is not an
+object or lacks a required key. The response uses `INVALID_INPUT` and names
+the path or missing key. A declared default fills an absent key. Endpoints
+not listed here have no explicit input contract.
+
+- `/proofs/review` — requires `reviewer`, `proof`, `decision`, `note`

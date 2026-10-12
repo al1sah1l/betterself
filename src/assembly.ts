@@ -2,6 +2,7 @@ import { assemble } from "@mit-sdg/sync-engine/assembly";
 import { applicationConceptSet } from "./concepts.ts";
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
 import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
+import { ReviewProof } from "./compositions/verification.ts";
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -17,6 +18,9 @@ export function assembleApplication() {
         },
         proofSharing: {
           ShareProofWithGroup,
+        },
+        verification: {
+          ReviewProof,
         },
       },
     },
