@@ -9,7 +9,10 @@ import {
   SignOut,
 } from "./compositions/authentication.ts";
 
-import { CreateGoal } from "./compositions/goals.ts";
+import {
+  CreateGoal,
+  SetStrategy,
+} from "./compositions/goals.ts";
 
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
 import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
@@ -38,6 +41,7 @@ export function assembleApplication() {
 
         goals: {
           CreateGoal,
+          SetStrategy,
         },
 
         completion: {

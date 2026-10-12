@@ -320,7 +320,7 @@ then
 
 Authored path: `BetterSelf.goals.CreateGoal`.
 - Covered by [Goal Management](../design/compositions/goals.md), line 3.
-- Covered by [Goal Management](../design/compositions/goals.md), line 10.
+- Covered by [Goal Management](../design/compositions/goals.md), line 16.
 
 ```reaction
 when RequestBoundary.request (constraints, currentContext, outcome, path: "/goals/create", requestId, session, successDefinition, timeline)
@@ -332,7 +332,7 @@ then
 
 Authored path: `BetterSelf.goals.CreateGoal`.
 - Covered by [Goal Management](../design/compositions/goals.md), line 3.
-- Covered by [Goal Management](../design/compositions/goals.md), line 10.
+- Covered by [Goal Management](../design/compositions/goals.md), line 16.
 
 ```reaction
 when Sessioning.current (session, subject: owner), asked by BetterSelf.goals.CreateGoal
@@ -346,7 +346,7 @@ then
 
 Authored path: `BetterSelf.goals.CreateGoal`.
 - Covered by [Goal Management](../design/compositions/goals.md), line 3.
-- Covered by [Goal Management](../design/compositions/goals.md), line 10.
+- Covered by [Goal Management](../design/compositions/goals.md), line 16.
 
 ```reaction
 when GoalPlanning.createGoal (constraints, currentContext, outcome, owner, successDefinition, timeline, goal), asked by BetterSelf.goals.CreateGoal#2
@@ -354,6 +354,78 @@ where
   earlier, RequestBoundary.request (constraints, currentContext, outcome, path: "/goals/create", requestId, session, successDefinition, timeline)
 then
   RequestBoundary.respond (goal, requestId)
+```
+
+### BetterSelf.goals.SetStrategy
+
+Authored path: `BetterSelf.goals.SetStrategy`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 9.
+- Covered by [Goal Management](../design/compositions/goals.md), line 17.
+
+```reaction
+when RequestBoundary.request (goal, path: "/goals/set-strategy", requestId, session, strategy)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.goals.SetStrategy:authorized#2
+
+Authored path: `BetterSelf.goals.SetStrategy`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 9.
+- Covered by [Goal Management](../design/compositions/goals.md), line 17.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.goals.SetStrategy
+where
+  earlier, RequestBoundary.request (goal, path: "/goals/set-strategy", requestId, session, strategy)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  GoalPlanning.setStrategy (goal, strategy)
+```
+
+### BetterSelf.goals.SetStrategy:authorized#3
+
+Authored path: `BetterSelf.goals.SetStrategy`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 9.
+- Covered by [Goal Management](../design/compositions/goals.md), line 17.
+
+```reaction
+when GoalPlanning.setStrategy (goal, strategy), asked by BetterSelf.goals.SetStrategy:authorized#2
+where
+  earlier, RequestBoundary.request (goal, path: "/goals/set-strategy", requestId, session, strategy)
+then
+  RequestBoundary.respond (goal, requestId)
+```
+
+### BetterSelf.goals.SetStrategy:forbidden#2
+
+Authored path: `BetterSelf.goals.SetStrategy`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 9.
+- Covered by [Goal Management](../design/compositions/goals.md), line 17.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.goals.SetStrategy
+where
+  earlier, RequestBoundary.request (goal, path: "/goals/set-strategy", requestId, session, strategy)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.goals.SetStrategy:missing#2
+
+Authored path: `BetterSelf.goals.SetStrategy`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 9.
+- Covered by [Goal Management](../design/compositions/goals.md), line 17.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.goals.SetStrategy
+where
+  earlier, RequestBoundary.request (goal, path: "/goals/set-strategy", requestId, session, strategy)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
 ```
 
 ### BetterSelf.proofSharing.ShareProofWithGroup
@@ -471,4 +543,5 @@ not listed here have no explicit input contract.
 - `/auth/sign-in` — requires `username`, `password`
 - `/auth/sign-out` — requires `session`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
+- `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`

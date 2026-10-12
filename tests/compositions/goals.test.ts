@@ -9,7 +9,11 @@ import {
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 
 import { applicationConceptSet } from "../../src/concepts.ts";
-import { CreateGoal } from "../../src/compositions/goals.ts";
+
+import {
+  CreateGoal,
+  SetStrategy,
+} from "../../src/compositions/goals.ts";
 
 import {
   openTestDb,
@@ -44,6 +48,7 @@ function assembleTestApplication() {
       BetterSelf: {
         goals: {
           CreateGoal,
+          SetStrategy,
         },
       },
     },
@@ -102,6 +107,24 @@ const goalFields = {
     "Receive and accept a software engineering internship offer.",
 };
 
+const initialStrategy = [
+  {
+    description:
+      "Apply to five relevant software engineering internships each week.",
+    successCriterion:
+      "At least five relevant applications are submitted each week.",
+  },
+];
+
+const replacementStrategy = [
+  {
+    description:
+      "Attend two recruiting events each week.",
+    successCriterion:
+      "Two recruiting events are attended each week.",
+  },
+];
+
 test("authenticated user becomes the goal owner", async () => {
   const app = assembleTestApplication();
 
@@ -146,7 +169,7 @@ test("client cannot spoof goal owner", async () => {
     await createGoalThroughEndpoint(app, {
       session,
 
-      // This must be ignored by the endpoint.
+      // Must be ignored by the endpoint.
       owner: "alex",
 
       ...goalFields,
@@ -191,4 +214,172 @@ test("invalid session does not create a goal", async () => {
     });
 
   expect(mayaGoals).toEqual([]);
+});
+
+test("goal owner can set the initial strategy", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(
+    app,
+    "maya",
+  );
+
+  const created =
+    await createGoalThroughEndpoint(app, {
+      session,
+      ...goalFields,
+    });
+
+  const result = await app.invoker.invoke(
+    "/goals/set-strategy",
+    {
+      session,
+      goal: created.goal,
+      strategy: initialStrategy,
+    },
+  );
+
+  expect(result.ok).toBe(true);
+
+  const goals =
+    await app.concepts.GoalPlanning._goal({
+      goal: created.goal,
+    });
+
+  expect(goals).toHaveLength(1);
+
+  expect(goals[0].currentStrategy).toEqual(
+    initialStrategy,
+  );
+});
+
+test("user cannot set strategy for another user's goal", async () => {
+  const app = assembleTestApplication();
+
+  const mayaSession = await createSession(
+    app,
+    "maya",
+  );
+
+  const alexSession = await createSession(
+    app,
+    "alex",
+  );
+
+  const created =
+    await createGoalThroughEndpoint(app, {
+      session: mayaSession,
+      ...goalFields,
+    });
+
+  const result = await app.invoker.invoke(
+    "/goals/set-strategy",
+    {
+      session: alexSession,
+      goal: created.goal,
+      strategy: initialStrategy,
+    },
+  );
+
+  expect(result.ok).toBe(false);
+
+    if (result.ok) {
+        throw new Error(
+            "Expected SetStrategy to be forbidden.",
+        );
+        }
+
+        expect(result.error).toEqual({
+        kind: "domain",
+        value: "FORBIDDEN",
+    });
+
+  const goals =
+    await app.concepts.GoalPlanning._goal({
+      goal: created.goal,
+    });
+
+  expect(goals).toHaveLength(1);
+
+  expect(goals[0].currentStrategy).toBeUndefined();
+});
+
+test("setting strategy for missing goal returns GOAL_NOT_FOUND", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(
+    app,
+    "maya",
+  );
+
+  const result = await app.invoker.invoke(
+    "/goals/set-strategy",
+    {
+      session,
+      goal: "missing-goal",
+      strategy: initialStrategy,
+    },
+  );
+
+  expect(result.ok).toBe(false);
+
+    if (result.ok) {
+        throw new Error(
+            "Expected missing goal to return an error.",
+        );
+    }
+
+    expect(result.error).toEqual({
+        kind: "domain",
+        value: "GOAL_NOT_FOUND",
+    });
+});
+
+test("setting strategy twice does not overwrite the original strategy", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(
+    app,
+    "maya",
+  );
+
+  const created =
+    await createGoalThroughEndpoint(app, {
+      session,
+      ...goalFields,
+    });
+
+  await app.invoker.invoke(
+    "/goals/set-strategy",
+    {
+      session,
+      goal: created.goal,
+      strategy: initialStrategy,
+    },
+  );
+
+  await app.invoker.invoke(
+    "/goals/set-strategy",
+    {
+      session,
+      goal: created.goal,
+      strategy: replacementStrategy,
+    },
+    {
+      timeoutMs: 1000,
+    },
+  );
+
+  await app.whenIdle();
+
+  const goals =
+    await app.concepts.GoalPlanning._goal({
+      goal: created.goal,
+    });
+
+  expect(goals).toHaveLength(1);
+
+  expect(goals[0].currentStrategy).toEqual(
+    initialStrategy,
+  );
 });

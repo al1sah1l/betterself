@@ -67,6 +67,17 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
   };
+  "/goals/set-strategy": {
+    input: {
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["setStrategy"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+      "strategy": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["setStrategy"]>[0], ["strategy"]>>;
+    };
+    output: {
+      "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["setStrategy"]>[0], ["goal"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "STRATEGY_ALREADY_SET" | "UNKNOWN_SESSION" };
+  };
   "/proofs/review": {
     input: {
       "decision": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["decision"]>>;

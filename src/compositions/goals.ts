@@ -4,6 +4,11 @@ import {
   respond,
 } from "@mit-sdg/sync-engine/boundary";
 
+import {
+  no,
+  where,
+} from "@mit-sdg/sync-engine/language";
+
 import { concepts } from "../concepts.ts";
 
 const {
@@ -64,6 +69,91 @@ export const CreateGoal = endpoint(
         "constraints",
         "timeline",
         "successDefinition",
+      ],
+    },
+  },
+);
+
+export const SetStrategy = endpoint(
+  "/goals/set-strategy",
+  ({
+    session,
+    user,
+    goal,
+    strategy,
+  }) =>
+    receive({
+      session,
+      goal,
+      strategy,
+    })
+      .then(
+        Sessioning.current({
+          session,
+        }).responds({
+          subject: user,
+        }),
+      )
+      .then(
+        where(
+          GoalPlanning._goal({
+            goal,
+          }).is({
+            owner: user,
+          }),
+        )
+          .then(
+            GoalPlanning.setStrategy({
+              goal,
+              strategy,
+            }).responds({}),
+          )
+          .then(
+            respond({
+              goal,
+            }),
+          )
+          .named("authorized"),
+
+        where(
+          no(
+            GoalPlanning._goal({
+              goal,
+            }),
+          ),
+        )
+          .then(
+            respond({
+              error: "GOAL_NOT_FOUND",
+            }),
+          )
+          .named("missing"),
+
+        where(
+          GoalPlanning._goal({
+            goal,
+          }).is({}),
+          no(
+            GoalPlanning._goal({
+              goal,
+            }).is({
+              owner: user,
+            }),
+          ),
+        )
+          .then(
+            respond({
+              error: "FORBIDDEN",
+            }),
+          )
+          .named("forbidden"),
+      ),
+  {
+    input: {
+      required: [
+        "session",
+        "goal",
+        "strategy",
       ],
     },
   },
