@@ -147,6 +147,19 @@ then
   CommitmentTracking.claimComplete (commitment, occurrence)
 ```
 
+### BetterSelf.proofSharing.ShareProofWithGroup
+
+Authored path: `BetterSelf.proofSharing.ShareProofWithGroup`.
+- Covered by [Proof Sharing](../design/compositions/proof-sharing.md), line 3.
+
+```reaction
+when ProofVerifying.submitProof (goal, proof)
+where
+  AccountabilityGrouping._groupForGoal (goal)
+then
+  AccountabilityGrouping.shareProof (goal, proof)
+```
+
 ### DeliverFaultToAsker
 
 ```reaction
