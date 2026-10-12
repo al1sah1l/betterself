@@ -10,6 +10,8 @@ export default {
       new URL("./design/compositions/completion.md", import.meta.url),
       new URL("./design/compositions/proof-sharing.md", import.meta.url),
       new URL("./design/compositions/verification.md", import.meta.url),
+      new URL("./design/compositions/authentication.md", import.meta.url),
+      new URL("./design/compositions/goals.md", import.meta.url),
     ],
   },
 };
