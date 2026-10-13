@@ -500,6 +500,158 @@ then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
 ```
 
+### BetterSelf.groups.AttachGoal
+
+Authored path: `BetterSelf.groups.AttachGoal`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 11.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 20.
+
+```reaction
+when RequestBoundary.request (goal, group, path: "/groups/attach-goal", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groups.AttachGoal:authorized#2
+
+Authored path: `BetterSelf.groups.AttachGoal`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 11.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groups.AttachGoal
+where
+  earlier, RequestBoundary.request (goal, group, path: "/groups/attach-goal", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  AccountabilityGrouping.attachGoal (goal, group, user)
+```
+
+### BetterSelf.groups.AttachGoal:authorized#3
+
+Authored path: `BetterSelf.groups.AttachGoal`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 11.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 20.
+
+```reaction
+when AccountabilityGrouping.attachGoal (goal, group, user), asked by BetterSelf.groups.AttachGoal:authorized#2
+where
+  earlier, RequestBoundary.request (goal, group, path: "/groups/attach-goal", requestId, session)
+then
+  RequestBoundary.respond (group, requestId)
+```
+
+### BetterSelf.groups.AttachGoal:forbiddenGoal#2
+
+Authored path: `BetterSelf.groups.AttachGoal`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 11.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groups.AttachGoal
+where
+  earlier, RequestBoundary.request (goal, group, path: "/groups/attach-goal", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.groups.AttachGoal:missingGoal#2
+
+Authored path: `BetterSelf.groups.AttachGoal`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 11.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groups.AttachGoal
+where
+  earlier, RequestBoundary.request (goal, group, path: "/groups/attach-goal", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.groups.CreateGroup
+
+Authored path: `BetterSelf.groups.CreateGroup`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 3.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 18.
+
+```reaction
+when RequestBoundary.request (name, path: "/groups/create", requestId, session, topic)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groups.CreateGroup#2
+
+Authored path: `BetterSelf.groups.CreateGroup`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 3.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 18.
+
+```reaction
+when Sessioning.current (session, subject: owner), asked by BetterSelf.groups.CreateGroup
+where
+  earlier, RequestBoundary.request (name, path: "/groups/create", requestId, session, topic)
+then
+  AccountabilityGrouping.createGroup (name, owner, topic)
+```
+
+### BetterSelf.groups.CreateGroup#3
+
+Authored path: `BetterSelf.groups.CreateGroup`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 3.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 18.
+
+```reaction
+when AccountabilityGrouping.createGroup (name, owner, topic, group), asked by BetterSelf.groups.CreateGroup#2
+where
+  earlier, RequestBoundary.request (name, path: "/groups/create", requestId, session, topic)
+then
+  RequestBoundary.respond (group, requestId)
+```
+
+### BetterSelf.groups.JoinGroup
+
+Authored path: `BetterSelf.groups.JoinGroup`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 7.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 19.
+
+```reaction
+when RequestBoundary.request (group, path: "/groups/join", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groups.JoinGroup#2
+
+Authored path: `BetterSelf.groups.JoinGroup`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 7.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 19.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groups.JoinGroup
+where
+  earlier, RequestBoundary.request (group, path: "/groups/join", requestId, session)
+then
+  AccountabilityGrouping.joinGroup (group, user)
+```
+
+### BetterSelf.groups.JoinGroup#3
+
+Authored path: `BetterSelf.groups.JoinGroup`.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 7.
+- Covered by [Accountability Groups](../design/compositions/groups.md), line 19.
+
+```reaction
+when AccountabilityGrouping.joinGroup (group, user), asked by BetterSelf.groups.JoinGroup#2
+where
+  earlier, RequestBoundary.request (group, path: "/groups/join", requestId, session)
+then
+  RequestBoundary.respond (group, requestId)
+```
+
 ### BetterSelf.proofSharing.ShareProofWithGroup
 
 Authored path: `BetterSelf.proofSharing.ShareProofWithGroup`.
@@ -723,5 +875,8 @@ not listed here have no explicit input contract.
 - `/commitments/create` — requires `session`, `goal`, `description`, `recurring`, `schedule`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
+- `/groups/attach-goal` — requires `session`, `group`, `goal`
+- `/groups/create` — requires `session`, `name`, `topic`
+- `/groups/join` — requires `session`, `group`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`
 - `/proofs/submit` — requires `session`, `goal`, `commitment`, `occurrence`, `evidence`

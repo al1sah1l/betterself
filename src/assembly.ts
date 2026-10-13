@@ -17,6 +17,12 @@ import {
 import {CreateCommitment} from "./compositions/commitments.ts";
 import { SubmitProof } from "./compositions/proofs.ts";
 
+import {
+  CreateGroup,
+  JoinGroup,
+  AttachGoal,
+} from "./compositions/groups.ts";
+
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
 import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
 import { ReviewProof } from "./compositions/verification.ts";
@@ -65,6 +71,12 @@ export function assembleApplication() {
 
         verification: {
           ReviewProof,
+        },
+
+        groups: {
+          CreateGroup,
+          JoinGroup,
+          AttachGoal,
         },
       },
     },

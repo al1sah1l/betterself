@@ -91,6 +91,38 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "STRATEGY_ALREADY_SET" | "UNKNOWN_SESSION" };
   };
+  "/groups/attach-goal": {
+    input: {
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["attachGoal"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "group": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["attachGoal"]>[0], ["group"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "group": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["attachGoal"]>[0], ["group"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_ALREADY_ATTACHED" | "GOAL_NOT_FOUND" | "GROUP_NOT_FOUND" | "INVALID_INPUT" | "NOT_GROUP_MEMBER" | "UNKNOWN_SESSION" };
+  };
+  "/groups/create": {
+    input: {
+      "name": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["createGroup"]>[0], ["name"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+      "topic": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["createGroup"]>[0], ["topic"]>>;
+    };
+    output: {
+      "group": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["createGroup"]>>, ["group"]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
+  "/groups/join": {
+    input: {
+      "group": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["joinGroup"]>[0], ["group"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "group": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["joinGroup"]>[0], ["group"]>>;
+    };
+    error: { error: AppWideError | "ALREADY_MEMBER" | "GROUP_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
   "/proofs/review": {
     input: {
       "decision": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["decision"]>>;
