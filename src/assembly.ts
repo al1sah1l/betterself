@@ -27,6 +27,11 @@ import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
 import { ReviewProof } from "./compositions/verification.ts";
 import { ProposeStrategy } from "./compositions/strategy-proposal.ts";
 
+import {
+  ListMyGoals,
+  MyGoals,
+} from "./compositions/dashboard.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -81,6 +86,11 @@ export function assembleApplication() {
         
         strategyProposal: {
           ProposeStrategy,
+        },
+
+        dashboard: {
+          ListMyGoals,
+          MyGoals,
         },
 
       },
