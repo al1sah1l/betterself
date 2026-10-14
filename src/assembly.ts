@@ -37,6 +37,11 @@ import {
   GoalDetail,
 } from "./compositions/goal-detail.ts";
 
+import {
+  ListMyGroups,
+  MyGroups,
+} from "./compositions/my-groups.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -98,6 +103,8 @@ export function assembleApplication() {
           MyGoals,
           GetGoalDetail,
           GoalDetail,
+          ListMyGroups,
+          MyGroups,
         },
         
 

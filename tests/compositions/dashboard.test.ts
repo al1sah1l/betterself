@@ -24,6 +24,11 @@ import {
   GoalDetail,
 } from "../../src/compositions/goal-detail.ts";
 
+import {
+  ListMyGroups,
+  MyGroups,
+} from "../../src/compositions/my-groups.ts";
+
 let testDb: TestDb;
 
 beforeAll(async () => {
@@ -54,6 +59,8 @@ function assembleTestApplication() {
           MyGoals,
           GetGoalDetail,
           GoalDetail,
+          ListMyGroups,
+          MyGroups,
         },
       },
     },
@@ -368,3 +375,123 @@ test("goal detail includes saved strategy and only this goal's commitments", asy
     },
   });
 });
+
+async function createGroup(
+  app: TestApplication,
+  owner: string,
+  name: string,
+) {
+  const result =
+    await app.concepts.AccountabilityGrouping.createGroup({
+      owner,
+      name,
+      topic: "Self-directed goals",
+    });
+
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    !("group" in result) ||
+    typeof result.group !== "string"
+  ) {
+    throw new Error("Could not create group.");
+  }
+
+  return result.group;
+}
+
+test("my groups includes owned and joined groups but excludes other groups", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(app, "maya");
+
+  const ownedGroup = await createGroup(
+    app,
+    "maya",
+    "Maya's group",
+  );
+
+  const joinedGroup = await createGroup(
+    app,
+    "alex",
+    "Shared group",
+  );
+
+  await app.concepts.AccountabilityGrouping.joinGroup({
+    group: joinedGroup,
+    user: "maya",
+  });
+
+  await createGroup(app, "alex", "Alex's private group");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/groups",
+    {
+      session,
+      user: "alex",
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  const value = result.value as {
+    groups: Array<{
+      group: string;
+      name: string;
+      topic: string;
+    }>;
+  };
+
+  expect(value.groups).toHaveLength(2);
+
+  expect(value.groups).toContainEqual({
+    group: ownedGroup,
+    name: "Maya's group",
+    topic: "Self-directed goals",
+  });
+
+  expect(value.groups).toContainEqual({
+    group: joinedGroup,
+    name: "Shared group",
+    topic: "Self-directed goals",
+  });
+});
+
+test("user with no memberships receives an empty group list", async () => {
+  const app = assembleTestApplication();
+
+  await createGroup(app, "alex", "Alex's group");
+
+  const session = await createSession(app, "maya");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/groups",
+    { session },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  expect(result.value).toEqual({
+    groups: [],
+  });
+});
+
+test("invalid session cannot list groups", async () => {
+  const app = assembleTestApplication();
+
+  await createGroup(app, "maya", "Maya's group");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/groups",
+    {
+      session: "invalid-session",
+    },
+  );
+
+  expect(result.ok).toBe(false);
+});
+
