@@ -8,6 +8,10 @@ import {
   type StrategyGenerator,
 } from "./Reasoning.ts";
 
+import {
+  openAIStrategyGenerator,
+} from "./openai-strategy-generator.ts";
+
 const placeholderGenerator: StrategyGenerator = async ({
   outcome,
   currentContext,
@@ -49,9 +53,14 @@ export const reasoning = registerConcept({
     mongo: ({ db }: { db: Db }) => {
         void db;
 
+        const generator =
+        process.env.NODE_ENV === "test"
+            ? placeholderGenerator
+            : openAIStrategyGenerator;
+
         return new ReasoningConcept(
-        placeholderGenerator,
+        generator,
         );
     },
-  },
+},
 });
