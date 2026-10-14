@@ -42,6 +42,12 @@ import {
   MyGroups,
 } from "./compositions/my-groups.ts";
 
+import {
+  GroupMember,
+  GroupProofs,
+  ListGroupProofs,
+} from "./compositions/group-proofs.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -105,6 +111,9 @@ export function assembleApplication() {
           GoalDetail,
           ListMyGroups,
           MyGroups,
+          GroupMember,
+          GroupProofs,
+          ListGroupProofs,
         },
         
 

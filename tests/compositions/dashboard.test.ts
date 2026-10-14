@@ -29,6 +29,14 @@ import {
   MyGroups,
 } from "../../src/compositions/my-groups.ts";
 
+import {
+  GroupMember,
+  GroupProofs,
+  ListGroupProofs,
+} from "../../src/compositions/group-proofs.ts";
+
+import { ReviewProof } from "../../src/compositions/verification.ts";
+
 let testDb: TestDb;
 
 beforeAll(async () => {
@@ -61,6 +69,12 @@ function assembleTestApplication() {
           GoalDetail,
           ListMyGroups,
           MyGroups,
+          GroupMember,
+          GroupProofs,
+          ListGroupProofs,
+        },
+        verification: {
+            ReviewProof,
         },
       },
     },
@@ -495,3 +509,226 @@ test("invalid session cannot list groups", async () => {
   expect(result.ok).toBe(false);
 });
 
+test("joined member can read an empty group proof list", async () => {
+  const app = assembleTestApplication();
+
+  const group = await createGroup(app, "maya", "Shared group");
+
+  await app.concepts.AccountabilityGrouping.joinGroup({
+    group,
+    user: "alex",
+  });
+
+  const session = await createSession(app, "alex");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/group-proofs",
+    { session, group },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  expect(result.value).toEqual({ proofs: [] });
+});
+
+test("nonmember cannot read group proofs even with a supplied member identity", async () => {
+  const app = assembleTestApplication();
+
+  const group = await createGroup(app, "maya", "Maya's group");
+  const session = await createSession(app, "alex");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/group-proofs",
+    {
+      session,
+      group,
+      user: "maya",
+    },
+  );
+
+  if (result.ok) {
+    throw new Error("Expected request to be forbidden.");
+  }
+
+  expect(result.error).toEqual({
+    kind: "domain",
+    value: "FORBIDDEN",
+  });
+});
+
+test("missing group returns GROUP_NOT_FOUND", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(app, "maya");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/group-proofs",
+    {
+      session,
+      group: "missing-group",
+    },
+  );
+
+  if (result.ok) {
+    throw new Error("Expected missing group error.");
+  }
+
+  expect(result.error).toEqual({
+    kind: "domain",
+    value: "GROUP_NOT_FOUND",
+  });
+});
+
+test("invalid session cannot read group proofs", async () => {
+  const app = assembleTestApplication();
+
+  const group = await createGroup(app, "maya", "Maya's group");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/group-proofs",
+    {
+      session: "invalid-session",
+      group,
+    },
+  );
+
+  expect(result.ok).toBe(false);
+});
+
+test("group proofs includes evidence and updates after peer review", async () => {
+  const app = assembleTestApplication();
+
+  const goal = await createGoal(app, "maya");
+  const group = await createGroup(app, "maya", "Shared group");
+  const session = await createSession(app, "alex");
+
+  await app.concepts.AccountabilityGrouping.joinGroup({
+    group,
+    user: "alex",
+  });
+
+  await app.concepts.AccountabilityGrouping.attachGoal({
+    group,
+    user: "maya",
+    goal,
+  });
+
+  const created =
+    await app.concepts.CommitmentTracking.createCommitment({
+      goal,
+      description: "Apply to five internships",
+      recurring: true,
+      schedule: "Every Monday",
+    });
+
+  if (
+    typeof created !== "object" ||
+    created === null ||
+    !("commitment" in created) ||
+    typeof created.commitment !== "string"
+  ) {
+    throw new Error("Could not create commitment.");
+  }
+
+  const commitment = created.commitment;
+  const occurrence = new Date("2026-10-12T17:00:00.000Z");
+  const evidence = [
+    "Screenshot of submitted applications",
+    "Application confirmation email",
+  ];
+
+  const submitted = await app.concepts.ProofVerifying.submitProof({
+    submitter: "maya",
+    goal,
+    commitment,
+    occurrence,
+    evidence,
+  });
+
+  if (
+    typeof submitted !== "object" ||
+    submitted === null ||
+    !("proof" in submitted) ||
+    typeof submitted.proof !== "string"
+  ) {
+    throw new Error("Could not submit proof.");
+  }
+
+  const proof = submitted.proof;
+
+  await app.concepts.AccountabilityGrouping.shareProof({
+    goal,
+    proof,
+  });
+
+  const expectedProof = {
+    proof,
+    submitter: "maya",
+    goal,
+    commitment,
+    occurrence,
+    evidence,
+  };
+
+  const before = await app.invoker.invoke(
+    "/dashboard/group-proofs",
+    { session, group },
+  );
+
+  if (!before.ok) {
+    throw new Error(JSON.stringify(before.error));
+  }
+
+  expect(before.value).toEqual({
+    proofs: [
+      {
+        ...expectedProof,
+        verifications: [],
+      },
+    ],
+  });
+
+  const note = "The evidence supports the claimed completion.";
+
+  const reviewed = await app.invoker.invoke(
+    "/proofs/review",
+    {
+      session,
+      proof,
+      decision: "verified",
+      note,
+    },
+  );
+
+  if (!reviewed.ok) {
+    throw new Error(JSON.stringify(reviewed.error));
+  }
+
+  await app.whenIdle();
+
+  const after = await app.invoker.invoke(
+    "/dashboard/group-proofs",
+    { session, group },
+  );
+
+  if (!after.ok) {
+    throw new Error(JSON.stringify(after.error));
+  }
+
+  expect(after.value).toEqual({
+    proofs: [
+      {
+        ...expectedProof,
+        verifications: [
+          {
+            reviewer: "alex",
+            decision: "verified",
+            note,
+          },
+        ],
+      },
+    ],
+  });
+});
