@@ -32,6 +32,11 @@ import {
   MyGoals,
 } from "./compositions/dashboard.ts";
 
+import {
+  GetGoalDetail,
+  GoalDetail,
+} from "./compositions/goal-detail.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -91,7 +96,10 @@ export function assembleApplication() {
         dashboard: {
           ListMyGoals,
           MyGoals,
+          GetGoalDetail,
+          GoalDetail,
         },
+        
 
       },
     },

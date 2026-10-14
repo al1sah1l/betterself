@@ -19,6 +19,11 @@ import {
   type TestDb,
 } from "../test-db.ts";
 
+import {
+  GetGoalDetail,
+  GoalDetail,
+} from "../../src/compositions/goal-detail.ts";
+
 let testDb: TestDb;
 
 beforeAll(async () => {
@@ -47,6 +52,8 @@ function assembleTestApplication() {
         dashboard: {
           ListMyGoals,
           MyGoals,
+          GetGoalDetail,
+          GoalDetail,
         },
       },
     },
@@ -200,4 +207,164 @@ test("invalid session cannot list goals", async () => {
   );
 
   expect(result.ok).toBe(false);
+});
+
+test("owner can open a goal without strategy or commitments", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(app, "maya");
+  const goal = await createGoal(app, "maya");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/goal",
+    {
+      session,
+      goal,
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  expect(result.value).toEqual({
+    detail: {
+      goal,
+      ...goalContext,
+      currentStrategy: null,
+      commitments: [],
+    },
+  });
+});
+
+test("another user cannot open someone else's goal", async () => {
+  const app = assembleTestApplication();
+
+  const goal = await createGoal(app, "maya");
+  const session = await createSession(app, "alex");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/goal",
+    { session, goal },
+  );
+
+  if (result.ok) {
+    throw new Error("Expected request to be forbidden.");
+  }
+
+  expect(result.error).toEqual({
+    kind: "domain",
+    value: "FORBIDDEN",
+  });
+});
+
+test("opening a missing goal returns GOAL_NOT_FOUND", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(app, "maya");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/goal",
+    {
+      session,
+      goal: "missing-goal",
+    },
+  );
+
+  if (result.ok) {
+    throw new Error("Expected missing goal error.");
+  }
+
+  expect(result.error).toEqual({
+    kind: "domain",
+    value: "GOAL_NOT_FOUND",
+  });
+});
+
+test("invalid session cannot open goal detail", async () => {
+  const app = assembleTestApplication();
+
+  const goal = await createGoal(app, "maya");
+
+  const result = await app.invoker.invoke(
+    "/dashboard/goal",
+    {
+      session: "invalid-session",
+      goal,
+    },
+  );
+
+  expect(result.ok).toBe(false);
+});
+
+test("goal detail includes saved strategy and only this goal's commitments", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(app, "maya");
+  const goal = await createGoal(app, "maya");
+  const otherGoal = await createGoal(app, "maya");
+
+  const strategy = [
+    {
+      description: "Prepare a resume for internship applications.",
+      successCriterion: "One updated resume is ready to submit.",
+    },
+  ];
+
+  await app.concepts.GoalPlanning.setStrategy({
+    goal,
+    strategy,
+  });
+
+  const commitmentFields = {
+    description: "Update my resume",
+    recurring: false,
+    schedule: "By Friday",
+  };
+
+  const created =
+    await app.concepts.CommitmentTracking.createCommitment({
+      goal,
+      ...commitmentFields,
+    });
+
+  if (
+    typeof created !== "object" ||
+    created === null ||
+    !("commitment" in created) ||
+    typeof created.commitment !== "string"
+  ) {
+    throw new Error("Could not create commitment.");
+  }
+
+  await app.concepts.CommitmentTracking.createCommitment({
+    goal: otherGoal,
+    description: "This belongs to another goal",
+    recurring: true,
+    schedule: "Every Monday",
+  });
+
+  const result = await app.invoker.invoke(
+    "/dashboard/goal",
+    { session, goal },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  expect(result.value).toEqual({
+    detail: {
+      goal,
+      ...goalContext,
+      currentStrategy: strategy,
+      commitments: [
+        {
+          commitment: created.commitment,
+          ...commitmentFields,
+          active: true,
+        },
+      ],
+    },
+  });
 });
