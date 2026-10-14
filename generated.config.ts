@@ -14,7 +14,8 @@ export default {
       new URL("./design/compositions/goals.md", import.meta.url),
       new URL("./design/compositions/commitments.md", import.meta.url),
       new URL("./design/compositions/proofs.md", import.meta.url),
-      new URL("./design/compositions/groups.md", import.meta.url)
+      new URL("./design/compositions/groups.md", import.meta.url),
+      new URL("./design/compositions/strategy-proposal.md", import.meta.url),
     ],
   },
 };

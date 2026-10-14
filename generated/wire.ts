@@ -148,4 +148,14 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "COMMITMENT_GOAL_MISMATCH" | "COMMITMENT_NOT_FOUND" | "COMMITMENT_RETIRED" | "COMPLETION_ALREADY_CLAIMED" | "EVIDENCE_REQUIRED" | "FORBIDDEN" | "GOAL_NOT_ATTACHED" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "ONE_TIME_ALREADY_COMPLETED" | "PROOF_ALREADY_SHARED" | "PROOF_ALREADY_SUBMITTED" | "UNKNOWN_SESSION" };
   };
+  "/strategies/propose": {
+    input: {
+      "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "strategy": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Reasoning"]["proposeStrategy"]>>, ["strategy"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "INVALID_STRATEGY_PROPOSAL" | "UNKNOWN_SESSION" };
+  };
 };

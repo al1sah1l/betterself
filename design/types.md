@@ -31,4 +31,6 @@ instantiate AccountabilityGrouping with
   User is Authenticating.Account
   Goal is GoalPlanning.Goal
   Proof is ProofVerifying.Proof
+
+instantiate Reasoning
 ```

@@ -1,5 +1,4 @@
 import { assemble } from "@mit-sdg/sync-engine/assembly";
-
 import { applicationConceptSet } from "./concepts.ts";
 
 import {
@@ -14,7 +13,7 @@ import {
   SetStrategy,
 } from "./compositions/goals.ts";
 
-import {CreateCommitment} from "./compositions/commitments.ts";
+import {CreateCommitment} from "./compositions/comitments.ts";
 import { SubmitProof } from "./compositions/proofs.ts";
 
 import {
@@ -26,6 +25,7 @@ import {
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
 import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
 import { ReviewProof } from "./compositions/verification.ts";
+import { ProposeStrategy } from "./compositions/strategy-proposal.ts";
 
 import { db } from "./db.ts";
 
@@ -78,6 +78,11 @@ export function assembleApplication() {
           JoinGroup,
           AttachGoal,
         },
+        
+        strategyProposal: {
+          ProposeStrategy,
+        },
+
       },
     },
   });

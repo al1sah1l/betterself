@@ -148,6 +148,19 @@ Defined in [ProofVerifying](../design/concepts/ProofVerifying.md), line 1.
   - `Goal` is `GoalPlanning.Goal` — [BetterSelf Types and Instances](../design/types.md), line 26.
   - `User` is `Authenticating.Account` — [BetterSelf Types and Instances](../design/types.md), line 25.
 
+### Reasoning
+
+Defined in [Reasoning](../design/concepts/Reasoning.md), line 1.
+
+#### Actions
+
+- `proposeStrategy(outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String) : returns (strategy: Strategy)`
+  - Refuses `INVALID_STRATEGY_PROPOSAL`: The reasoner did not produce a valid strategy.
+
+#### Instances
+
+- `Reasoning` — instance of `Reasoning` — [BetterSelf Types and Instances](../design/types.md), line 35.
+
 ### Sessioning
 
 Defined in [Sessioning](../design/concepts/Sessioning.md), line 1.
@@ -771,6 +784,78 @@ then
   RequestBoundary.respond (error: "COMMITMENT_GOAL_MISMATCH", requestId)
 ```
 
+### BetterSelf.strategyProposal.ProposeStrategy
+
+Authored path: `BetterSelf.strategyProposal.ProposeStrategy`.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 3.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 18.
+
+```reaction
+when RequestBoundary.request (goal, path: "/strategies/propose", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.strategyProposal.ProposeStrategy:authorized#2
+
+Authored path: `BetterSelf.strategyProposal.ProposeStrategy`.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 3.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 18.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.strategyProposal.ProposeStrategy
+where
+  earlier, RequestBoundary.request (goal, path: "/strategies/propose", requestId, session)
+  GoalPlanning._goal (goal) has (constraints, currentContext, outcome, owner: user, successDefinition, timeline)
+then
+  Reasoning.proposeStrategy (constraints, currentContext, outcome, successDefinition, timeline)
+```
+
+### BetterSelf.strategyProposal.ProposeStrategy:authorized#3
+
+Authored path: `BetterSelf.strategyProposal.ProposeStrategy`.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 3.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 18.
+
+```reaction
+when Reasoning.proposeStrategy (constraints, currentContext, outcome, successDefinition, timeline, strategy), asked by BetterSelf.strategyProposal.ProposeStrategy:authorized#2
+where
+  earlier, RequestBoundary.request (goal, path: "/strategies/propose", requestId, session)
+then
+  RequestBoundary.respond (requestId, strategy)
+```
+
+### BetterSelf.strategyProposal.ProposeStrategy:forbidden#2
+
+Authored path: `BetterSelf.strategyProposal.ProposeStrategy`.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 3.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 18.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.strategyProposal.ProposeStrategy
+where
+  earlier, RequestBoundary.request (goal, path: "/strategies/propose", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.strategyProposal.ProposeStrategy:missingGoal#2
+
+Authored path: `BetterSelf.strategyProposal.ProposeStrategy`.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 3.
+- Covered by [Strategy Proposal](../design/compositions/strategy-proposal.md), line 18.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.strategyProposal.ProposeStrategy
+where
+  earlier, RequestBoundary.request (goal, path: "/strategies/propose", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
 ### BetterSelf.verification.ReviewProof
 
 Authored path: `BetterSelf.verification.ReviewProof`.
@@ -880,3 +965,4 @@ not listed here have no explicit input contract.
 - `/groups/join` — requires `session`, `group`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`
 - `/proofs/submit` — requires `session`, `goal`, `commitment`, `occurrence`, `evidence`
+- `/strategies/propose` — requires `session`, `goal`

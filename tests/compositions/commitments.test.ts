@@ -9,7 +9,7 @@ import {
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 
 import { applicationConceptSet } from "../../src/concepts.ts";
-import { CreateCommitment } from "../../src/compositions/commitments.ts";
+import { CreateCommitment } from "../../src/compositions/comitments.ts";
 
 import {
   openTestDb,
