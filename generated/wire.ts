@@ -62,6 +62,7 @@ export type ApplicationWire = {
       "recurring": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["recurring"]>>;
       "schedule": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["schedule"]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+      "sourceStep"?: Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>[0], ["sourceStep"]>>;
     };
     output: {
       "commitment": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>>, ["commitment"]>>;
@@ -75,9 +76,9 @@ export type ApplicationWire = {
     };
     output: {
       "detail": {
-        "commitments": {
+        "commitments": ({
           "active": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["active"]>>;
-          "commitment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["commitment"]>>;
+          "commitment": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitment"]>[0], ["commitment"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["commitment"]>]>>;
           "completions": {
             "completion": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_completionsByCommitment"]>>>, ["completion"]>>;
             "occurrence": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_completionsByCommitment"]>>>, ["occurrence"]>>;
@@ -85,7 +86,8 @@ export type ApplicationWire = {
           "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["description"]>>;
           "recurring": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["recurring"]>>;
           "schedule": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["schedule"]>>;
-        }[];
+          "sourceStep": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitment"]>>>, ["sourceStep"]>> | null;
+        })[];
         "constraints": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["constraints"]>>;
         "currentContext": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["currentContext"]>>;
         "currentStrategy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["currentStrategy"]>> | null;

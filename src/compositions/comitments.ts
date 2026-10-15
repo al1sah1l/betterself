@@ -26,6 +26,7 @@ export const CreateCommitment = endpoint(
     description,
     recurring,
     schedule,
+    sourceStep,
     commitment,
   }) =>
     receive({
@@ -34,6 +35,7 @@ export const CreateCommitment = endpoint(
       description,
       recurring,
       schedule,
+      sourceStep,
     })
       .then(
         Sessioning.current({
@@ -56,6 +58,7 @@ export const CreateCommitment = endpoint(
               description,
               recurring,
               schedule,
+              sourceStep,
             }).responds({
               commitment,
             }),
@@ -109,6 +112,9 @@ export const CreateCommitment = endpoint(
         "recurring",
         "schedule",
       ],
+      defaults: {
+        sourceStep: "",
+      },
     },
   },
 );

@@ -6,6 +6,7 @@ const props = defineProps<{
   session: string;
   goal: string;
   initialDescription?: string;
+  sourceStep?: string;
 }>();
 
 const emit = defineEmits<{
@@ -39,6 +40,7 @@ async function createCommitment() {
         description: description.value.trim(),
         recurring: recurring.value,
         schedule: schedule.value.trim(),
+        sourceStep: props.sourceStep ?? "",
       },
     );
 

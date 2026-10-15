@@ -1,4 +1,8 @@
-import { MongoServerError, type Collection, type Db } from "mongodb";
+import {
+  MongoServerError,
+  type Collection,
+  type Db,
+} from "mongodb";
 
 export class CommitmentNotFound extends Error {}
 export class CommitmentRetired extends Error {}
@@ -14,6 +18,7 @@ interface CommitmentDocument<Goal extends string> {
   schedule: string;
   active: boolean;
   createdAt: Date;
+  sourceStep?: string;
 }
 
 interface CompletionDocument {
@@ -25,12 +30,17 @@ interface CompletionDocument {
 
 const readiness = new WeakMap<object, Promise<void>>();
 
-function ensureReady(completions: Collection<CompletionDocument>) {
+function ensureReady(
+  completions: Collection<CompletionDocument>,
+) {
   let ready = readiness.get(completions);
 
   if (!ready) {
     ready = Promise.all([
-      completions.createIndex({ commitment: 1, claimKey: 1 }, { unique: true }),
+      completions.createIndex(
+        { commitment: 1, claimKey: 1 },
+        { unique: true },
+      ),
     ]).then(() => undefined);
 
     readiness.set(completions, ready);
@@ -44,8 +54,15 @@ export class CommitmentTrackingConcept<Goal extends string> {
   private readonly completions: Collection<CompletionDocument>;
 
   constructor(db: Db) {
-    this.commitments = db.collection<CommitmentDocument<Goal>>("commitmentTracking.commitments");
-    this.completions = db.collection<CompletionDocument>("commitmentTracking.completions");
+    this.commitments =
+      db.collection<CommitmentDocument<Goal>>(
+        "commitmentTracking.commitments",
+      );
+
+    this.completions =
+      db.collection<CompletionDocument>(
+        "commitmentTracking.completions",
+      );
   }
 
   async createCommitment({
@@ -53,11 +70,13 @@ export class CommitmentTrackingConcept<Goal extends string> {
     description,
     recurring,
     schedule,
+    sourceStep,
   }: {
     goal: Goal;
     description: string;
     recurring: boolean;
     schedule: string;
+    sourceStep?: string;
   }) {
     await ensureReady(this.completions);
 
@@ -69,6 +88,9 @@ export class CommitmentTrackingConcept<Goal extends string> {
       description,
       recurring,
       schedule,
+      ...(sourceStep !== undefined && sourceStep !== ""
+      ? { sourceStep }
+      : {}),
       active: true,
       createdAt: new Date(),
     });
@@ -76,21 +98,37 @@ export class CommitmentTrackingConcept<Goal extends string> {
     return { commitment };
   }
 
-  async claimComplete({ commitment, occurrence }: { commitment: string; occurrence: Date }) {
+  async claimComplete({
+    commitment,
+    occurrence,
+  }: {
+    commitment: string;
+    occurrence: Date;
+  }) {
     await ensureReady(this.completions);
 
-    const existingCommitment = await this.commitments.findOne({ _id: commitment });
+    const existingCommitment =
+      await this.commitments.findOne({
+        _id: commitment,
+      });
 
     if (!existingCommitment) {
-      throw new CommitmentNotFound("There is no such commitment.");
+      throw new CommitmentNotFound(
+        "There is no such commitment.",
+      );
     }
 
     if (!existingCommitment.active) {
-      throw new CommitmentRetired("This commitment is no longer active.");
+      throw new CommitmentRetired(
+        "This commitment is no longer active.",
+      );
     }
 
     if (!existingCommitment.recurring) {
-      const existingCompletion = await this.completions.findOne({ commitment });
+      const existingCompletion =
+        await this.completions.findOne({
+          commitment,
+        });
 
       if (existingCompletion) {
         throw new OneTimeAlreadyCompleted(
@@ -106,9 +144,17 @@ export class CommitmentTrackingConcept<Goal extends string> {
     const completion = crypto.randomUUID();
 
     try {
-      await this.completions.insertOne({ _id: completion, commitment, occurrence, claimKey });
+      await this.completions.insertOne({
+        _id: completion,
+        commitment,
+        occurrence,
+        claimKey,
+      });
     } catch (error) {
-      if (error instanceof MongoServerError && error.code === 11000) {
+      if (
+        error instanceof MongoServerError &&
+        error.code === 11000
+      ) {
         if (!existingCommitment.recurring) {
           throw new OneTimeAlreadyCompleted(
             "This one-time commitment has already been completed.",
@@ -126,17 +172,28 @@ export class CommitmentTrackingConcept<Goal extends string> {
     return { completion };
   }
 
-  async retireCommitment({ commitment }: { commitment: string }) {
+  async retireCommitment({
+    commitment,
+  }: {
+    commitment: string;
+  }) {
     await ensureReady(this.completions);
 
-    const existingCommitment = await this.commitments.findOne({ _id: commitment });
+    const existingCommitment =
+      await this.commitments.findOne({
+        _id: commitment,
+      });
 
     if (!existingCommitment) {
-      throw new CommitmentNotFound("There is no such commitment.");
+      throw new CommitmentNotFound(
+        "There is no such commitment.",
+      );
     }
 
     if (!existingCommitment.active) {
-      throw new CommitmentAlreadyRetired("This commitment is already retired.");
+      throw new CommitmentAlreadyRetired(
+        "This commitment is already retired.",
+      );
     }
 
     await this.commitments.updateOne(
@@ -147,8 +204,14 @@ export class CommitmentTrackingConcept<Goal extends string> {
     return { commitment };
   }
 
-  async _commitment({ commitment }: { commitment: string }) {
-    const found = await this.commitments.findOne({ _id: commitment });
+  async _commitment({
+    commitment,
+  }: {
+    commitment: string;
+  }) {
+    const found = await this.commitments.findOne({
+      _id: commitment,
+    });
 
     if (!found) {
       return [];
@@ -160,10 +223,17 @@ export class CommitmentTrackingConcept<Goal extends string> {
       recurring: found.recurring,
       schedule: found.schedule,
       active: found.active,
+      ...(found.sourceStep !== undefined
+        ? { sourceStep: found.sourceStep }
+        : {}),
     }];
   }
 
-  async _commitmentsByGoal({ goal }: { goal: Goal }) {
+  async _commitmentsByGoal({
+    goal,
+  }: {
+    goal: Goal;
+  }) {
     const commitments = await this.commitments
       .find({ goal })
       .sort({ createdAt: 1 })
@@ -175,10 +245,17 @@ export class CommitmentTrackingConcept<Goal extends string> {
       recurring: commitment.recurring,
       schedule: commitment.schedule,
       active: commitment.active,
+      ...(commitment.sourceStep !== undefined
+        ? { sourceStep: commitment.sourceStep }
+        : {}),
     }));
   }
 
-  async _completionsByCommitment({ commitment }: { commitment: string }) {
+  async _completionsByCommitment({
+    commitment,
+  }: {
+    commitment: string;
+  }) {
     const completions = await this.completions
       .find({ commitment })
       .sort({ occurrence: 1 })

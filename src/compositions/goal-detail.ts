@@ -38,6 +38,7 @@ export const GoalDetail = former(
       recurring,
       schedule,
       active,
+      sourceStep,
       completion,
       occurrence,
     },
@@ -81,24 +82,35 @@ export const GoalDetail = former(
           schedule,
           active,
         }),
-      ).form({
-        commitment,
-        description,
-        recurring,
-        schedule,
-        active,
-        completions: each(
-          CommitmentTracking._completionsByCommitment({
-            commitment,
-          }).is({
+      )
+        .where(
+          whether(
+            CommitmentTracking._commitment({
+              commitment,
+            }).is({
+              sourceStep,
+            }),
+          ),
+        )
+        .form({
+          commitment,
+          description,
+          recurring,
+          schedule,
+          active,
+          sourceStep,
+          completions: each(
+            CommitmentTracking._completionsByCommitment({
+              commitment,
+            }).is({
+              completion,
+              occurrence,
+            }),
+          ).form({
             completion,
             occurrence,
           }),
-        ).form({
-          completion,
-          occurrence,
         }),
-      }),
     }),
 );
 

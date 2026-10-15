@@ -25,6 +25,7 @@ a set of Commitments with
   a schedule String
   an active Flag
   a createdAt DateTime
+  an optional sourceStep String
 
 a set of Completions with
   a commitment Commitment
@@ -35,12 +36,13 @@ a set of Completions with
 ## Actions
 
 ```actions
-createCommitment(goal: Goal, description: String, recurring: Flag, schedule: String) : returns (commitment: Commitment)
+createCommitment(goal: Goal, description: String, recurring: Flag, schedule: String, sourceStep?: String) : returns (commitment: Commitment)
   where true
   then
     add a new Commitment with goal, description, recurring, schedule, active true, and the current creation time
+    store sourceStep when supplied and non-empty as an opaque reference identifying the source planning step
     returns commitment
-
+    
 claimComplete(commitment: Commitment, occurrence: DateTime) : returns (completion: Completion)
   where commitment is in Commitments and commitment is active and commitment is recurring and no Completion has this commitment and occurrence
   then
@@ -84,10 +86,10 @@ retireCommitment(commitment: Commitment) : returns (commitment: Commitment)
 ## Queries
 
 ```queries
-_commitment(commitment: Commitment) : optional (goal: Goal, description: String, recurring: Flag, schedule: String, active: Flag)
+_commitment(commitment: Commitment) : optional (goal: Goal, description: String, recurring: Flag, schedule: String, active: Flag, sourceStep?: String)
   Returns the commitment's current fields, or no row when the commitment does not exist.
 
-_commitmentsByGoal(goal: Goal) : many (commitment: Commitment, description: String, recurring: Flag, schedule: String, active: Flag)
+_commitmentsByGoal(goal: Goal) : many (commitment: Commitment, description: String, recurring: Flag, schedule: String, active: Flag, sourceStep?: String)
   Returns all commitments for this goal in creation order, or no rows when the goal has no commitments.
 
 _completionsByCommitment(commitment: Commitment) : many (completion: Completion, occurrence: DateTime)

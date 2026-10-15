@@ -71,7 +71,7 @@ Defined in [CommitmentTracking](../design/concepts/CommitmentTracking.md), line 
 
 #### Actions
 
-- `createCommitment(goal: Goal, description: String, recurring: Flag, schedule: String) : returns (commitment: Commitment)`
+- `createCommitment(goal: Goal, description: String, recurring: Flag, schedule: String, sourceStep?: String) : returns (commitment: Commitment)`
 - `claimComplete(commitment: Commitment, occurrence: DateTime) : returns (completion: Completion)`
   - Refuses `COMMITMENT_NOT_FOUND`: There is no such commitment.
   - Refuses `COMMITMENT_RETIRED`: This commitment is no longer active.
@@ -83,8 +83,8 @@ Defined in [CommitmentTracking](../design/concepts/CommitmentTracking.md), line 
 
 #### Queries
 
-- `_commitment(commitment: Commitment) : optional (goal: Goal, description: String, recurring: Flag, schedule: String, active: Flag)`
-- `_commitmentsByGoal(goal: Goal) : many (commitment: Commitment, description: String, recurring: Flag, schedule: String, active: Flag)`
+- `_commitment(commitment: Commitment) : optional (goal: Goal, description: String, recurring: Flag, schedule: String, active: Flag, sourceStep?: String)`
+- `_commitmentsByGoal(goal: Goal) : many (commitment: Commitment, description: String, recurring: Flag, schedule: String, active: Flag, sourceStep?: String)`
 - `_completionsByCommitment(commitment: Commitment) : many (completion: Completion, occurrence: DateTime)`
 
 #### Instances
@@ -213,12 +213,13 @@ Authored path: `BetterSelf.dashboard.GoalDetail`.
 - Covered by [Goal Management](../design/compositions/goals.md), line 24.
 
 ```former
-Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active, completion, occurrence); promises exactly one record — forms:
+Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active, sourceStep, completion, occurrence); promises exactly one record — forms:
   a record of
     where GoalPlanning._goal (goal) has (constraints, currentContext, outcome, successDefinition, timeline)
     where whether GoalPlanning._goal (goal) has (currentStrategy)
     where whether AccountabilityGrouping._groupForGoal (goal) has (group)
     commitments: each CommitmentTracking._commitmentsByGoal (goal) has (active, commitment, description, recurring, schedule)
+      where whether CommitmentTracking._commitment (commitment) has (sourceStep)
       form a record of
         active
         commitment
@@ -229,6 +230,7 @@ Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentConte
         description
         recurring
         schedule
+        sourceStep
     constraints
     currentContext
     currentStrategy
@@ -427,10 +429,10 @@ then
 
 Authored path: `BetterSelf.commitments.CreateCommitment`.
 - Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
-- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 14.
 
 ```reaction
-when RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+when RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session, sourceStep)
 then
   Sessioning.current (session)
 ```
@@ -439,27 +441,27 @@ then
 
 Authored path: `BetterSelf.commitments.CreateCommitment`.
 - Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
-- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 14.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.commitments.CreateCommitment
 where
-  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session, sourceStep)
   GoalPlanning._goal (goal) has (owner: user)
 then
-  CommitmentTracking.createCommitment (description, goal, recurring, schedule)
+  CommitmentTracking.createCommitment (description, goal, recurring, schedule, sourceStep)
 ```
 
 ### BetterSelf.commitments.CreateCommitment:authorized#3
 
 Authored path: `BetterSelf.commitments.CreateCommitment`.
 - Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
-- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 14.
 
 ```reaction
-when CommitmentTracking.createCommitment (description, goal, recurring, schedule, commitment), asked by BetterSelf.commitments.CreateCommitment:authorized#2
+when CommitmentTracking.createCommitment (description, goal, recurring, schedule, sourceStep, commitment), asked by BetterSelf.commitments.CreateCommitment:authorized#2
 where
-  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session, sourceStep)
 then
   RequestBoundary.respond (commitment, requestId)
 ```
@@ -468,12 +470,12 @@ then
 
 Authored path: `BetterSelf.commitments.CreateCommitment`.
 - Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
-- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 14.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.commitments.CreateCommitment
 where
-  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session, sourceStep)
   GoalPlanning._goal (goal)
   no GoalPlanning._goal (goal) has (owner: user)
 then
@@ -484,12 +486,12 @@ then
 
 Authored path: `BetterSelf.commitments.CreateCommitment`.
 - Covered by [Commitment Management](../design/compositions/commitments.md), line 3.
-- Covered by [Commitment Management](../design/compositions/commitments.md), line 12.
+- Covered by [Commitment Management](../design/compositions/commitments.md), line 14.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.commitments.CreateCommitment
 where
-  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session)
+  earlier, RequestBoundary.request (description, goal, path: "/commitments/create", recurring, requestId, schedule, session, sourceStep)
   no GoalPlanning._goal (goal)
 then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
@@ -568,7 +570,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 52.
 
 ```reaction
 when RequestBoundary.request (group, path: "/dashboard/group-proofs", requestId, session)
@@ -580,7 +582,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 52.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
@@ -596,7 +598,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 52.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
@@ -612,7 +614,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 52.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
@@ -1231,7 +1233,7 @@ not listed here have no explicit input contract.
 - `/auth/register` — requires `username`, `password`
 - `/auth/sign-in` — requires `username`, `password`
 - `/auth/sign-out` — requires `session`
-- `/commitments/create` — requires `session`, `goal`, `description`, `recurring`, `schedule`
+- `/commitments/create` — requires `session`, `goal`, `description`, `recurring`, `schedule`; fills `sourceStep` with "" when absent
 - `/dashboard/goal` — requires `session`, `goal`
 - `/dashboard/goals` — requires `session`
 - `/dashboard/group-proofs` — requires `session`, `group`

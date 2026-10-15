@@ -415,6 +415,7 @@ test("goal detail includes saved strategy, attached group, completion claims, an
           commitment: created.commitment,
           ...commitmentFields,
           active: true,
+          sourceStep: null,
           completions: [
             {
               completion: claimed.completion,
