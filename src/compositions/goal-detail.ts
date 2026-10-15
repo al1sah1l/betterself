@@ -38,6 +38,8 @@ export const GoalDetail = former(
       recurring,
       schedule,
       active,
+      completion,
+      occurrence,
     },
   ) =>
     where(
@@ -85,6 +87,17 @@ export const GoalDetail = former(
         recurring,
         schedule,
         active,
+        completions: each(
+          CommitmentTracking._completionsByCommitment({
+            commitment,
+          }).is({
+            completion,
+            occurrence,
+          }),
+        ).form({
+          completion,
+          occurrence,
+        }),
       }),
     }),
 );

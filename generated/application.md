@@ -213,7 +213,7 @@ Authored path: `BetterSelf.dashboard.GoalDetail`.
 - Covered by [Goal Management](../design/compositions/goals.md), line 24.
 
 ```former
-Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active); promises exactly one record — forms:
+Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active, completion, occurrence); promises exactly one record — forms:
   a record of
     where GoalPlanning._goal (goal) has (constraints, currentContext, outcome, successDefinition, timeline)
     where whether GoalPlanning._goal (goal) has (currentStrategy)
@@ -222,6 +222,10 @@ Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentConte
       form a record of
         active
         commitment
+        completions: each CommitmentTracking._completionsByCommitment (commitment) has (completion, occurrence)
+          form a record of
+            completion
+            occurrence
         description
         recurring
         schedule

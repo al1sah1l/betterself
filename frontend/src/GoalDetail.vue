@@ -22,6 +22,10 @@ type Commitment = {
   recurring: boolean;
   schedule: string;
   active: boolean;
+  completions: {
+    completion: string;
+    occurrence: string;
+  }[];
 };
 
 type GoalData = {
@@ -176,6 +180,27 @@ onMounted(loadDetail);
             · {{ commitment.recurring ? "Recurring" : "One-time" }}
             · {{ commitment.active ? "Active" : "Retired" }}
           </p>
+
+          <div>
+            <h4>Completion claims</h4>
+
+            <ul v-if="commitment.completions.length">
+                <li
+                v-for="claim in commitment.completions"
+                :key="claim.completion"
+                >
+                Claimed completion:
+                {{ new Date(claim.occurrence).toLocaleString() }}
+                </li>
+            </ul>
+
+            <p v-else class="muted">No completion claims yet.</p>
+
+            <p class="muted">
+                A completion claim records reported execution.
+                Peer verification is shown separately in the group.
+            </p>
+          </div>
 
           <SubmitProof
             v-if="commitment.active"

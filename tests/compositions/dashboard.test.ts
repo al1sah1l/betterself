@@ -319,7 +319,7 @@ test("invalid session cannot open goal detail", async () => {
   expect(result.ok).toBe(false);
 });
 
-test("goal detail includes saved strategy, attached group, and only this goal's commitments", async () => {
+test("goal detail includes saved strategy, attached group, completion claims, and only this goal's commitments", async () => {
   const app = assembleTestApplication();
 
   const session = await createSession(app, "maya");
@@ -378,6 +378,23 @@ test("goal detail includes saved strategy, attached group, and only this goal's 
     goal,
   });
 
+  const occurrence = new Date("2026-10-14T17:00:00.000Z");
+
+  const claimed =
+    await app.concepts.CommitmentTracking.claimComplete({
+      commitment: created.commitment,
+      occurrence,
+    });
+
+  if (
+    typeof claimed !== "object" ||
+    claimed === null ||
+    !("completion" in claimed) ||
+    typeof claimed.completion !== "string"
+  ) {
+    throw new Error("Could not create completion claim.");
+  }
+
   const result = await app.invoker.invoke(
     "/dashboard/goal",
     { session, goal },
@@ -398,6 +415,12 @@ test("goal detail includes saved strategy, attached group, and only this goal's 
           commitment: created.commitment,
           ...commitmentFields,
           active: true,
+          completions: [
+            {
+              completion: claimed.completion,
+              occurrence,
+            },
+          ],
         },
       ],
     },
