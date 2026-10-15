@@ -8,6 +8,8 @@ import {
   CannotReviewOwnProof,
   ProofAlreadyReviewed,
   EvidenceRequired,
+  NotProofSubmitter,
+  ProofHasReviews,
 } from "./ProofVerifying.ts";
 
 export const proofVerifying = registerConcept({
@@ -19,6 +21,8 @@ export const proofVerifying = registerConcept({
     CANNOT_REVIEW_OWN_PROOF: CannotReviewOwnProof,
     PROOF_ALREADY_REVIEWED: ProofAlreadyReviewed,
     EVIDENCE_REQUIRED: EvidenceRequired,
+    NOT_PROOF_SUBMITTER: NotProofSubmitter,
+    PROOF_HAS_REVIEWS: ProofHasReviews,
   },
   floors: {
     mongo: ({ db }: { db: Db }) =>

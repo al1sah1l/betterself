@@ -97,6 +97,12 @@ shareProof(goal: Goal, proof: Proof) : returns (group: Group)
   then
     refuses PROOF_ALREADY_SHARED "This proof has already been shared with this group."
 
+unshareProof(proof: Proof) : returns (proof: Proof)
+  where true
+  then
+    remove all SharedProofs with this proof
+    returns proof
+
 checkMember(goal: Goal, user: User) : returns (group: Group)
   where a GoalAttachment has goal and group and a Membership has this group and user
   then

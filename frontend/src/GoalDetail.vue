@@ -16,16 +16,36 @@ type StrategyStep = {
   successCriterion: string;
 };
 
+type Verification = {
+  reviewer: string;
+  decision: "verified" | "disputed";
+  note: string;
+};
+
+type CompletionClaim = {
+  completion: string;
+  occurrence: string;
+  proofs: {
+    proof: string;
+    verifications: Verification[];
+  }[];
+};
+
+type SubmittedProof = {
+  proof: string;
+  occurrence: string;
+  evidence: string[];
+  verifications: Verification[];
+};
+
 type Commitment = {
   commitment: string;
   description: string;
   recurring: boolean;
   schedule: string;
   active: boolean;
-  completions: {
-    completion: string;
-    occurrence: string;
-  }[];
+  completions: CompletionClaim[];
+  proofs: SubmittedProof[];
   sourceStep: string | null;
 };
 
@@ -44,6 +64,10 @@ type GoalData = {
 const detail = ref<GoalData | null>(null);
 const loading = ref(false);
 const error = ref("");
+
+const deletingProof = ref("");
+const deleteError = ref("");
+const deleteSuccess = ref("");
 
 const commitmentDescription = ref("");
 const commitmentSourceStep = ref("");
@@ -68,9 +92,11 @@ function useStrategyStep(step: StrategyStep, index: number) {
 }
 
 function hasCommitmentForStep(index: number): boolean {
-  return detail.value?.commitments.some(
-    (commitment) => commitment.sourceStep === `step:${index}`,
-  ) ?? false;
+  return (
+    detail.value?.commitments.some(
+      (commitment) => commitment.sourceStep === `step:${index}`,
+    ) ?? false
+  );
 }
 
 function closeCommitment() {
@@ -126,18 +152,108 @@ async function loadDetail() {
   }
 }
 
+function proofStatus(proof: SubmittedProof) {
+  const verified = proof.verifications.some(
+    (review) => review.decision === "verified",
+  );
+
+  const disputed = proof.verifications.some(
+    (review) => review.decision === "disputed",
+  );
+
+  if (verified && disputed) {
+    return { label: "Mixed reviews", tone: "mixed" };
+  }
+
+  if (disputed) {
+    return { label: "Disputed", tone: "disputed" };
+  }
+
+  if (verified) {
+    return { label: "Verified", tone: "verified" };
+  }
+
+  return { label: "Pending review", tone: "pending" };
+}
+
+async function deletePendingProof(proof: SubmittedProof) {
+  if (deletingProof.value || loading.value) return;
+  if (proof.verifications.length > 0) return;
+
+  const confirmed = window.confirm(
+    "Delete this proof?",
+  );
+
+  if (!confirmed) return;
+
+  deletingProof.value = proof.proof;
+  deleteError.value = "";
+  deleteSuccess.value = "";
+
+  try {
+    await api<{ proof: string }>("/proofs/delete", {
+      session: props.session,
+      proof: proof.proof,
+    });
+
+    if (detail.value) {
+      for (const commitment of detail.value.commitments) {
+        commitment.proofs = commitment.proofs.filter(
+          (item) => item.proof !== proof.proof,
+        );
+
+        for (const claim of commitment.completions) {
+          claim.proofs = claim.proofs.filter(
+            (item) => item.proof !== proof.proof,
+          );
+        }
+      }
+    }
+
+    deleteSuccess.value = "Proof deleted.";
+
+    await loadDetail();
+  } catch (cause) {
+    if (cause instanceof ApiError) {
+      deleteError.value =
+        cause.code === "UNAUTHORIZED"
+          ? "Your session has expired. Please sign in again."
+          : cause.code === "FORBIDDEN"
+            ? "Only the submitter can delete this proof."
+            : cause.code === "CONFLICT"
+              ? "This proof has received a peer review and cannot be deleted. Reload the goal to see its status."
+              : cause.code === "NOT_FOUND"
+                ? "This proof no longer exists. Reload the goal."
+                : "Could not delete the proof. Please try again.";
+    } else {
+      deleteError.value =
+        cause instanceof Error
+          ? cause.message
+          : "Could not delete the proof. Please try again.";
+    }
+  } finally {
+    deletingProof.value = "";
+  }
+}
+
 onMounted(loadDetail);
 </script>
 
 <template>
-  <section class="goal-detail" aria-label="Goal detail">
-    <p v-if="loading" role="status">Loading goal...</p>
+  <section
+    class="goal-detail"
+    aria-label="Goal detail"
+    :aria-busy="loading"
+  >
+    <p v-if="loading && !detail" role="status">
+      Loading goal...
+    </p>
 
-    <p v-else-if="error" class="error" role="alert">
+    <p v-if="error" class="error" role="alert">
       {{ error }}
     </p>
 
-    <template v-else-if="detail">
+    <template v-if="detail">
       <h2>{{ detail.outcome }}</h2>
 
       <dl>
@@ -169,7 +285,7 @@ onMounted(loadDetail);
             class="text-button"
             type="button"
             @click="useStrategyStep(step, index)"
-            >
+          >
             Create commitment from this step
           </button>
 
@@ -206,6 +322,14 @@ onMounted(loadDetail);
 
       <h3>Commitments</h3>
 
+      <p v-if="deleteError" class="error" role="alert">
+        {{ deleteError }}
+      </p>
+
+      <p v-if="deleteSuccess" role="status">
+        {{ deleteSuccess }}
+      </p>
+
       <button
         class="primary"
         type="button"
@@ -228,33 +352,93 @@ onMounted(loadDetail);
           </p>
 
           <div>
-            <h4>Completion claims</h4>
+            <h4>Submitted proofs</h4>
 
-            <ul v-if="commitment.completions.length">
+            <ul v-if="commitment.proofs.length">
               <li
-                v-for="claim in commitment.completions"
-                :key="claim.completion"
+                v-for="proof in commitment.proofs"
+                :key="proof.proof"
               >
-                Claimed completion:
-                {{ new Date(claim.occurrence).toLocaleString() }}
+                <p>
+                  Occurrence:
+                  {{ new Date(proof.occurrence).toLocaleString() }}
+                </p>
+
+                <ul>
+                  <li
+                    v-for="(item, index) in proof.evidence"
+                    :key="index"
+                  >
+                    {{ item }}
+                  </li>
+                </ul>
+
+                <details class="claim-review">
+                  <summary
+                    class="review-badge"
+                    :class="`review-badge--${proofStatus(proof).tone}`"
+                  >
+                    {{ proofStatus(proof).label }}
+                  </summary>
+
+                  <div class="review-info">
+                    <p v-if="proof.verifications.length === 0">
+                      No peer reviews yet.
+                    </p>
+
+                    <ul v-else>
+                      <li
+                        v-for="review in proof.verifications"
+                        :key="review.reviewer"
+                      >
+                        <strong>{{ review.reviewer }}</strong>
+                        · {{ review.decision }}
+                        <p v-if="review.note">{{ review.note }}</p>
+                      </li>
+                    </ul>
+                  </div>
+                </details>
+
+                <button
+                  v-if="proof.verifications.length === 0"
+                  class="text-button delete-proof-button"
+                  type="button"
+                  :disabled="Boolean(deletingProof) || loading"
+                  @click="deletePendingProof(proof)"
+                >
+                  {{
+                    deletingProof === proof.proof
+                      ? "Deleting..."
+                      : "Delete pending proof"
+                  }}
+                </button>
               </li>
             </ul>
 
-            <p v-else class="muted">No completion claims yet.</p>
-
-            <p class="muted">
-              A completion claim records reported execution.
-              Peer verification is shown separately in the group.
-            </p>
+            <p v-else class="muted">No proofs submitted yet.</p>
           </div>
 
-          <SubmitProof
+          <details
             v-if="commitment.active"
-            :session="props.session"
-            :goal="props.goal"
-            :commitment="commitment.commitment"
-            @submitted="loadDetail"
-          />
+            class="proof-submission"
+          >
+            <summary>Submit proof</summary>
+
+            <SubmitProof
+              :session="props.session"
+              :goal="props.goal"
+              :commitment="commitment.commitment"
+              :existing-occurrence="
+                !commitment.recurring
+                  ? commitment.completions[0]?.occurrence
+                  : undefined
+              "
+              :disabled="
+                !commitment.recurring && commitment.proofs.length > 0
+              "
+              @submitted="loadDetail"
+            />
+          </details>
         </li>
       </ul>
 
@@ -267,7 +451,7 @@ onMounted(loadDetail);
       :disabled="loading"
       @click="loadDetail"
     >
-      Reload goal
+      {{ loading ? "Updating goal..." : "Reload goal" }}
     </button>
 
     <dialog
@@ -352,5 +536,93 @@ li {
 .dialog-header h3,
 .dialog-header button {
   margin: 0;
+}
+
+.claim-review {
+  margin-top: 8px;
+}
+
+.review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+
+.review-badge::-webkit-details-marker {
+  display: none;
+}
+
+.review-badge::after {
+  content: "+";
+}
+
+.claim-review[open] > .review-badge::after {
+  content: "−";
+}
+
+.review-badge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.review-badge--pending {
+  background: #eeedf1;
+  color: #5d5869;
+}
+
+.review-badge--verified {
+  background: #eee8fb;
+  color: #6041b1;
+}
+
+.review-badge--disputed {
+  background: #fff0f0;
+  color: #a32939;
+}
+
+.review-badge--mixed {
+  background: #fff3d6;
+  color: #805b13;
+}
+
+.review-info {
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.review-info p {
+  margin: 6px 0;
+}
+
+.delete-proof-button {
+  color: #a32939;
+}
+
+.proof-submission {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.proof-submission > summary {
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.proof-submission > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 </style>

@@ -40,9 +40,13 @@ The response contains [the group's shared proofs](former:BetterSelf.dashboard.Gr
 
 Each proof includes its identifier, submitter, goal, commitment, occurrence, evidence, and peer verifications. Each verification includes its reviewer, decision, and note.
 
-Goal detail includes each commitment's optional sourceStep reference, represented as null when no source step is stored.
+Goal detail includes all proofs submitted for each commitment and their peer reviews, independently of whether a completion claim was recorded.
 
 Proof evidence and peer verification remain separate fields. A proof with no verifications has an empty verification list.
+
+Each completion claim includes its matching proof, if present, and that proof's peer reviews. Reviews include the reviewer, decision, and note.
+
+Claims without matching proof remain visible with an empty proofs list.
 
 A group with no shared proofs returns an empty proof list.
 

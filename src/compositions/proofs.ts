@@ -20,6 +20,7 @@ const {
 
 export const SubmitProof = endpoint(
   "/proofs/submit",
+
   ({
     session,
     user,
@@ -50,11 +51,11 @@ export const SubmitProof = endpoint(
           }).is({
             owner: user,
           }),
-
           CommitmentTracking._commitment({
             commitment,
           }).is({
             goal,
+            recurring: true,
           }),
         )
           .then(
@@ -73,7 +74,144 @@ export const SubmitProof = endpoint(
               proof,
             }),
           )
-          .named("authorized"),
+          .named("authorizedRecurring"),
+
+        where(
+          GoalPlanning._goal({
+            goal,
+          }).is({
+            owner: user,
+          }),
+          CommitmentTracking._commitment({
+            commitment,
+          }).is({
+            goal,
+            recurring: false,
+          }),
+          no(
+            CommitmentTracking._completionsByCommitment({
+              commitment,
+            }),
+          ),
+        )
+          .then(
+            ProofVerifying.submitProof({
+              submitter: user,
+              goal,
+              commitment,
+              occurrence,
+              evidence,
+            }).responds({
+              proof,
+            }),
+          )
+          .then(
+            respond({
+              proof,
+            }),
+          )
+          .named("authorizedOneTime"),
+
+        where(
+          GoalPlanning._goal({
+            goal,
+          }).is({
+            owner: user,
+          }),
+          CommitmentTracking._commitment({
+            commitment,
+          }).is({
+            goal,
+            recurring: false,
+          }),
+          CommitmentTracking._completionsByCommitment({
+            commitment,
+          }).is({
+            occurrence,
+          }),
+          no(
+            ProofVerifying._proofForOccurrence({
+              commitment,
+              occurrence,
+            }),
+          ),
+        )
+          .then(
+            ProofVerifying.submitProof({
+              submitter: user,
+              goal,
+              commitment,
+              occurrence,
+              evidence,
+            }).responds({
+              proof,
+            }),
+          )
+          .then(
+            respond({
+              proof,
+            }),
+          )
+          .named("replaceDeletedProof"),
+
+        where(
+          GoalPlanning._goal({
+            goal,
+          }).is({
+            owner: user,
+          }),
+          CommitmentTracking._commitment({
+            commitment,
+          }).is({
+            goal,
+            recurring: false,
+          }),
+          CommitmentTracking._completionsByCommitment({
+            commitment,
+          }).is({}),
+          no(
+            CommitmentTracking._completionsByCommitment({
+              commitment,
+            }).is({
+              occurrence,
+            }),
+          ),
+        )
+          .then(
+            respond({
+              error: "ONE_TIME_ALREADY_COMPLETED",
+            }),
+          )
+          .named("alreadyCompleted"),
+
+        where(
+          GoalPlanning._goal({
+            goal,
+          }).is({
+            owner: user,
+          }),
+          CommitmentTracking._commitment({
+            commitment,
+          }).is({
+            goal,
+            recurring: false,
+          }),
+          CommitmentTracking._completionsByCommitment({
+            commitment,
+          }).is({
+            occurrence,
+          }),
+          ProofVerifying._proofForOccurrence({
+            commitment,
+            occurrence,
+          }).is({}),
+        )
+          .then(
+            respond({
+              error: "PROOF_ALREADY_SUBMITTED",
+            }),
+          )
+          .named("existingProof"),
 
         where(
           no(
@@ -151,6 +289,7 @@ export const SubmitProof = endpoint(
           )
           .named("wrongGoal"),
       ),
+
   {
     input: {
       required: [
@@ -160,6 +299,40 @@ export const SubmitProof = endpoint(
         "occurrence",
         "evidence",
       ],
+    },
+  },
+);
+
+export const DeletePendingProof = endpoint(
+  "/proofs/delete",
+
+  ({ session, submitter, proof }) =>
+    receive({
+      session,
+      proof,
+    })
+      .then(
+        Sessioning.current({
+          session,
+        }).responds({
+          subject: submitter,
+        }),
+      )
+      .then(
+        ProofVerifying.deletePendingProof({
+          submitter,
+          proof,
+        }).responds({}),
+      )
+      .then(
+        respond({
+          proof,
+        }),
+      ),
+
+  {
+    input: {
+      required: ["session", "proof"],
     },
   },
 );

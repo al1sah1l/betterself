@@ -148,6 +148,12 @@ export class AccountabilityGroupingConcept<
     return { group: attachment.group };
   }
 
+  async unshareProof({ proof }: { proof: Proof }) {
+    await this.sharedProofs.deleteMany({ proof });
+
+    return { proof };
+  }
+
   async checkMember({ goal, user }: { goal: Goal; user: User }) {
     const attachment = await this.goalAttachments.findOne({ goal });
     if (!attachment) throw new GoalNotAttached("This goal is not attached to an accountability group.");

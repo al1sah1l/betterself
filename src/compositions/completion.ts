@@ -1,7 +1,15 @@
-import { reaction, when } from "@mit-sdg/sync-engine/language";
+import {
+  no,
+  reaction,
+  when,
+} from "@mit-sdg/sync-engine/language";
+
 import { concepts } from "../concepts.ts";
 
-const { ProofVerifying, CommitmentTracking } = concepts;
+const {
+  ProofVerifying,
+  CommitmentTracking,
+} = concepts;
 
 export const RecordCompletionFromProof = reaction(
   ({ commitment, occurrence }) =>
@@ -10,10 +18,20 @@ export const RecordCompletionFromProof = reaction(
         commitment,
         occurrence,
       }).responds({}),
-    ).then(
-      CommitmentTracking.claimComplete({
-        commitment,
-        occurrence,
-      }),
-    ),
+    )
+      .where(
+        no(
+          CommitmentTracking._completionsByCommitment({
+            commitment,
+          }).is({
+            occurrence,
+          }),
+        ),
+      )
+      .then(
+        CommitmentTracking.claimComplete({
+          commitment,
+          occurrence,
+        }),
+      ),
 );

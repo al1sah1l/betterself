@@ -82,8 +82,26 @@ export type ApplicationWire = {
           "completions": {
             "completion": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_completionsByCommitment"]>>>, ["completion"]>>;
             "occurrence": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_completionsByCommitment"]>>>, ["occurrence"]>>;
+            "proofs": {
+              "proof": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proofForOccurrence"]>>>, ["proof"]>>;
+              "verifications": {
+                "decision": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["decision"]>>;
+                "note": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["note"]>>;
+                "reviewer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["reviewer"]>>;
+              }[];
+            }[];
           }[];
           "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["description"]>>;
+          "proofs": {
+            "evidence": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proofsByCommitment"]>>>, ["evidence"]>>;
+            "occurrence": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proofsByCommitment"]>>>, ["occurrence"]>>;
+            "proof": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proofsByCommitment"]>>>, ["proof"]>>;
+            "verifications": {
+              "decision": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["decision"]>>;
+              "note": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["note"]>>;
+              "reviewer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["reviewer"]>>;
+            }[];
+          }[];
           "recurring": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["recurring"]>>;
           "schedule": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["schedule"]>>;
           "sourceStep": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitment"]>>>, ["sourceStep"]>> | null;
@@ -208,6 +226,16 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "ALREADY_MEMBER" | "GROUP_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
   };
+  "/proofs/delete": {
+    input: {
+      "proof": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["deletePendingProof"]>[0], ["proof"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "proof": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["deletePendingProof"]>[0], ["proof"]>>;
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "NOT_PROOF_SUBMITTER" | "PROOF_HAS_REVIEWS" | "PROOF_NOT_FOUND" | "UNKNOWN_SESSION" };
+  };
   "/proofs/review": {
     input: {
       "decision": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["reviewProof"]>[0], ["decision"]>>;
@@ -225,10 +253,14 @@ export type ApplicationWire = {
       "commitment": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["commitment"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitment"]>[0], ["commitment"]>]>>;
       "evidence": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["evidence"]>>;
       "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
-      "occurrence": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["occurrence"]>>;
+      "occurrence": Jsonify<OneOf<[AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_completionsByCommitment"]>>>, ["occurrence"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>[0], ["occurrence"]>]>>;
       "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
     };
     output: {
+      "proof": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>>, ["proof"]>>;
+    } | {
+      "proof": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>>, ["proof"]>>;
+    } | {
       "proof": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>>, ["proof"]>>;
     };
     error: { error: AppWideError | "COMMITMENT_GOAL_MISMATCH" | "COMMITMENT_NOT_FOUND" | "COMMITMENT_RETIRED" | "COMPLETION_ALREADY_CLAIMED" | "EVIDENCE_REQUIRED" | "FORBIDDEN" | "GOAL_NOT_ATTACHED" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "ONE_TIME_ALREADY_COMPLETED" | "PROOF_ALREADY_SHARED" | "PROOF_ALREADY_SUBMITTED" | "UNKNOWN_SESSION" };

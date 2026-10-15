@@ -80,6 +80,21 @@ reviewProof(reviewer: User, proof: Proof, decision: VerificationDecision, note: 
   where proof is in Proofs and a Verification already has this proof and reviewer
   then
     refuses PROOF_ALREADY_REVIEWED "This user has already reviewed this proof."
+
+deletePendingProof(submitter: User, proof: Proof) : returns (proof: Proof)
+  where proof is in Proofs and the proof's submitter is submitter and no Verification has this proof
+  then
+    remove proof from Proofs
+    returns proof
+  where proof is not in Proofs
+  then
+    refuses PROOF_NOT_FOUND "There is no such proof."
+  where proof is in Proofs and the proof's submitter is not submitter
+  then
+    refuses NOT_PROOF_SUBMITTER "Only the submitter can delete this proof."
+  where proof is in Proofs and the proof's submitter is submitter and a Verification has this proof
+  then
+    refuses PROOF_HAS_REVIEWS "A proof with peer reviews cannot be deleted."
 ```
 
 ## Queries
@@ -90,6 +105,9 @@ _proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commit
 
 _proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: EvidenceBundle)
   Returns the proof and all of its evidence items for this commitment occurrence, or no row when no proof has been submitted.
+
+_proofsByCommitment(commitment: Commitment) : many (proof: Proof, submitter: User, goal: Goal, occurrence: DateTime, evidence: EvidenceBundle)
+  Returns all proofs for this commitment in creation order, including proofs without a completion claim.
 
 _verificationsByProof(proof: Proof) : many (reviewer: User, decision: VerificationDecision, note: String)
   Returns all peer verifications for this proof in creation order, or no rows when the proof has not been reviewed.

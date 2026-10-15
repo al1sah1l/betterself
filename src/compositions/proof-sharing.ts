@@ -24,3 +24,16 @@ export const ShareProofWithGroup = reaction(
         }),
       ),
 );
+
+export const UnshareDeletedProof = reaction(
+  ({ proof }) =>
+    when(
+      ProofVerifying.deletePendingProof({}).responds({
+        proof,
+      }),
+    ).then(
+      AccountabilityGrouping.unshareProof({
+        proof,
+      }),
+    ),
+);

@@ -8,7 +8,15 @@ import {
 
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 import { applicationConceptSet } from "../../src/concepts.ts";
-import { ShareProofWithGroup } from "../../src/compositions/proof-sharing.ts";
+import {
+  ShareProofWithGroup,
+  UnshareDeletedProof,
+} from "../../src/compositions/proof-sharing.ts";
+
+import {
+  DeletePendingProof,
+} from "../../src/compositions/proofs.ts";
+
 import { openTestDb, type TestDb } from "../test-db.ts";
 
 let testDb: TestDb;
@@ -37,6 +45,10 @@ function assembleTestApplication() {
       BetterSelf: {
         proofSharing: {
           ShareProofWithGroup,
+          UnshareDeletedProof,
+        },
+        proofs: {
+          DeletePendingProof,
         },
       },
     },
@@ -194,4 +206,123 @@ test("duplicate proof submission does not create another shared proof", async ()
   expect(sharedProofs[0]).toMatchObject({
     proof,
   });
+});
+
+test("deleting pending proof removes group reference and preserves completion claim", async () => {
+  const app = assembleTestApplication();
+  const group = await createGroup(app);
+
+  const created =
+    await app.concepts.CommitmentTracking.createCommitment({
+      goal: "goal-1",
+      description: "Update my resume",
+      recurring: false,
+      schedule: "By Friday",
+    });
+
+  if (
+    typeof created !== "object" ||
+    created === null ||
+    !("commitment" in created) ||
+    typeof created.commitment !== "string"
+  ) {
+    throw new Error("Could not create commitment.");
+  }
+
+  const commitment = created.commitment;
+  const occurrence = new Date("2026-10-12T17:00:00.000Z");
+
+  await app.concepts.AccountabilityGrouping.attachGoal({
+    group,
+    user: "maya",
+    goal: "goal-1",
+  });
+
+  const proof = await submitProof(app, {
+    goal: "goal-1",
+    commitment,
+    occurrence,
+  });
+
+  // This assembly tests sharing and deletion, so create the claim directly.
+  const claimed =
+    await app.concepts.CommitmentTracking.claimComplete({
+      commitment,
+      occurrence,
+    });
+
+  if (
+    typeof claimed !== "object" ||
+    claimed === null ||
+    !("completion" in claimed) ||
+    typeof claimed.completion !== "string"
+  ) {
+    throw new Error("Could not create completion claim.");
+  }
+
+  await app.whenIdle();
+
+  expect(
+    await app.concepts.AccountabilityGrouping._sharedProofs({
+      group,
+    }),
+  ).toEqual([{ proof }]);
+
+  const started = await app.concepts.Sessioning.start({
+    subject: "maya",
+  });
+
+  if (
+    typeof started !== "object" ||
+    started === null ||
+    !("session" in started) ||
+    typeof started.session !== "string"
+  ) {
+    throw new Error("Could not create session.");
+  }
+
+  const result = await app.invoker.invoke(
+    "/proofs/delete",
+    {
+      session: started.session,
+      proof,
+    },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  expect(result.value).toEqual({ proof });
+
+  await app.whenIdle();
+
+  expect(
+    await app.concepts.ProofVerifying._proof({ proof }),
+  ).toEqual([]);
+
+  expect(
+    await app.concepts.AccountabilityGrouping._sharedProofs({
+      group,
+    }),
+  ).toEqual([]);
+
+  expect(
+    await app.concepts.CommitmentTracking._completionsByCommitment({
+      commitment,
+    }),
+  ).toEqual([
+    {
+      completion: claimed.completion,
+      occurrence,
+    },
+  ]);
+
+  // Repeating cleanup is safe.
+  const cleaned =
+    await app.concepts.AccountabilityGrouping.unshareProof({
+      proof,
+    });
+
+  expect(cleaned).toEqual({ proof });
 });

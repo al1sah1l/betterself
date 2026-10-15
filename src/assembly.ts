@@ -14,7 +14,7 @@ import {
 } from "./compositions/goals.ts";
 
 import {CreateCommitment} from "./compositions/comitments.ts";
-import { SubmitProof } from "./compositions/proofs.ts";
+import { SubmitProof, DeletePendingProof } from "./compositions/proofs.ts";
 
 import {
   CreateGroup,
@@ -23,7 +23,7 @@ import {
 } from "./compositions/groups.ts";
 
 import { RecordCompletionFromProof } from "./compositions/completion.ts";
-import { ShareProofWithGroup } from "./compositions/proof-sharing.ts";
+import { ShareProofWithGroup, UnshareDeletedProof, } from "./compositions/proof-sharing.ts";
 import { ReviewProof } from "./compositions/verification.ts";
 import { ProposeStrategy } from "./compositions/strategy-proposal.ts";
 
@@ -80,6 +80,7 @@ export function assembleApplication() {
 
         proofs: {
           SubmitProof,
+          DeletePendingProof,
         },
 
         completion: {
@@ -88,6 +89,7 @@ export function assembleApplication() {
 
         proofSharing: {
           ShareProofWithGroup,
+          UnshareDeletedProof,
         },
 
         verification: {
@@ -115,8 +117,6 @@ export function assembleApplication() {
           GroupProofs,
           ListGroupProofs,
         },
-        
-
       },
     },
   });

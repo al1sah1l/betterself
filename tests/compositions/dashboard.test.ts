@@ -416,10 +416,12 @@ test("goal detail includes saved strategy, attached group, completion claims, an
           ...commitmentFields,
           active: true,
           sourceStep: null,
+          proofs: [],
           completions: [
             {
               completion: claimed.completion,
               occurrence,
+              proofs: [],
             },
           ],
         },
@@ -768,5 +770,114 @@ test("group proofs includes evidence and updates after peer review", async () =>
         ],
       },
     ],
+  });
+});
+
+test("goal owner sees proof and peer review without a completion claim", async () => {
+  const app = assembleTestApplication();
+
+  const session = await createSession(app, "maya");
+  const goal = await createGoal(app, "maya");
+
+  const commitmentFields = {
+    description: "Update my resume",
+    recurring: false,
+    schedule: "By Friday",
+  };
+
+  const created =
+    await app.concepts.CommitmentTracking.createCommitment({
+      goal,
+      ...commitmentFields,
+    });
+
+  if (
+    typeof created !== "object" ||
+    created === null ||
+    !("commitment" in created) ||
+    typeof created.commitment !== "string"
+  ) {
+    throw new Error("Could not create commitment.");
+  }
+
+  const commitment = created.commitment;
+  const occurrence = new Date("2026-10-14T17:00:00.000Z");
+  const evidence = ["Link to my updated resume"];
+
+  // Direct concept setup deliberately creates proof without a claim.
+  const submitted =
+    await app.concepts.ProofVerifying.submitProof({
+      submitter: "maya",
+      goal,
+      commitment,
+      occurrence,
+      evidence,
+    });
+
+  if (
+    typeof submitted !== "object" ||
+    submitted === null ||
+    !("proof" in submitted) ||
+    typeof submitted.proof !== "string"
+  ) {
+    throw new Error("Could not submit proof.");
+  }
+
+  const proof = submitted.proof;
+  const note = "The updated resume is visible.";
+
+  await app.concepts.ProofVerifying.reviewProof({
+    reviewer: "alex",
+    proof,
+    decision: "verified",
+    note,
+  });
+
+  const completions =
+    await app.concepts.CommitmentTracking._completionsByCommitment({
+      commitment,
+    });
+
+  expect(completions).toEqual([]);
+
+  const result = await app.invoker.invoke(
+    "/dashboard/goal",
+    { session, goal },
+  );
+
+  if (!result.ok) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  expect(result.value).toEqual({
+    detail: {
+      goal,
+      ...goalContext,
+      currentStrategy: null,
+      group: null,
+      commitments: [
+        {
+          commitment,
+          ...commitmentFields,
+          active: true,
+          sourceStep: null,
+          completions: [],
+          proofs: [
+            {
+              proof,
+              occurrence,
+              evidence,
+              verifications: [
+                {
+                  reviewer: "alex",
+                  decision: "verified",
+                  note,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
   });
 });

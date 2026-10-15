@@ -6,6 +6,8 @@ const props = defineProps<{
   session: string;
   goal: string;
   commitment: string;
+  existingOccurrence?: string;
+  disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -19,19 +21,25 @@ const error = ref("");
 const success = ref("");
 
 async function submitProof() {
-  if (loading.value) return;
+  if (loading.value || props.disabled) return;
 
   error.value = "";
-  emit("submitted");
   success.value = "";
 
-  const date = new Date(occurrence.value);
+  const occurrenceValue =
+    props.existingOccurrence ?? occurrence.value;
+
+  const date = new Date(occurrenceValue);
+
   const items = evidence.value
     .split("\n")
     .map((item) => item.trim())
     .filter(Boolean);
 
-  if (!occurrence.value || !Number.isFinite(date.getTime())) {
+  if (
+    !occurrenceValue ||
+    !Number.isFinite(date.getTime())
+  ) {
     error.value = "Choose when you completed this commitment.";
     return;
   }
@@ -52,8 +60,11 @@ async function submitProof() {
       evidence: items,
     });
 
-    success.value = "Proof submitted. Peer verification is a separate step.";
+    success.value =
+      "Proof submitted. Peer verification is a separate step.";
     evidence.value = "";
+
+    emit("submitted");
   } catch (cause) {
     error.value =
       cause instanceof ApiError
@@ -64,7 +75,7 @@ async function submitProof() {
             : cause.code === "NOT_FOUND"
               ? "The goal or commitment could not be found."
               : cause.code === "CONFLICT"
-                ? "Proof has already been submitted for this occurrence."
+                ? "This commitment is already completed, or proof already exists for this occurrence."
                 : cause.code === "INVALID_REQUEST"
                   ? "Please check the completion time and evidence."
                   : "Could not submit proof. Please try again."
@@ -79,20 +90,31 @@ async function submitProof() {
 
 <template>
   <form @submit.prevent="submitProof">
-    <fieldset :disabled="loading">
+    <fieldset :disabled="loading || props.disabled">
       <legend>Submit proof</legend>
 
-      <label :for="`occurrence-${props.commitment}`">
-        Completed at (your local time)
-      </label>
-      <input
-        :id="`occurrence-${props.commitment}`"
-        v-model="occurrence"
-        type="datetime-local"
-        required
-      />
+      <p v-if="props.existingOccurrence" class="muted">
+        Completed at:
+        {{ new Date(props.existingOccurrence).toLocaleString() }}
+      </p>
 
-      <label :for="`evidence-${props.commitment}`">Evidence</label>
+      <template v-else>
+        <label :for="`occurrence-${props.commitment}`">
+          Completed at (your local time)
+        </label>
+
+        <input
+          :id="`occurrence-${props.commitment}`"
+          v-model="occurrence"
+          type="datetime-local"
+          required
+        />
+      </template>
+
+      <label :for="`evidence-${props.commitment}`">
+        Evidence
+      </label>
+
       <textarea
         :id="`evidence-${props.commitment}`"
         v-model="evidence"
@@ -101,13 +123,28 @@ async function submitProof() {
         required
       />
 
-      <button class="primary" type="submit">
-        {{ loading ? "Submitting..." : "Submit proof" }}
+      <button
+        class="primary"
+        type="submit"
+        :disabled="loading || props.disabled"
+      >
+        {{
+          loading
+            ? "Submitting..."
+            : props.disabled
+              ? "Proof already submitted"
+              : "Submit proof"
+        }}
       </button>
     </fieldset>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
-    <p v-if="success" role="status">{{ success }}</p>
+    <p v-if="error" class="error" role="alert">
+      {{ error }}
+    </p>
+
+    <p v-if="success" role="status">
+      {{ success }}
+    </p>
   </form>
 </template>
 

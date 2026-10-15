@@ -101,6 +101,9 @@ const handler = createHttpHandler({
         GOAL_ALREADY_ATTACHED: "CONFLICT",
         GOAL_NOT_ATTACHED: "CONFLICT",
         PROOF_ALREADY_SHARED: "CONFLICT",
+
+        NOT_PROOF_SUBMITTER: "FORBIDDEN",
+        PROOF_HAS_REVIEWS: "CONFLICT",
     },
   }),
 });

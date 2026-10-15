@@ -19,6 +19,7 @@ const {
   GoalPlanning,
   CommitmentTracking,
   AccountabilityGrouping,
+  ProofVerifying,
 } = concepts;
 
 export const GoalDetail = former(
@@ -41,6 +42,11 @@ export const GoalDetail = former(
       sourceStep,
       completion,
       occurrence,
+      proof,
+      evidence,
+      reviewer,
+      decision,
+      note,
     },
   ) =>
     where(
@@ -99,6 +105,32 @@ export const GoalDetail = former(
           schedule,
           active,
           sourceStep,
+          proofs: each(
+            ProofVerifying._proofsByCommitment({
+              commitment,
+            }).is({
+              proof,
+              occurrence,
+              evidence,
+            }),
+          ).form({
+            proof,
+            occurrence,
+            evidence,
+            verifications: each(
+              ProofVerifying._verificationsByProof({
+                proof,
+              }).is({
+                reviewer,
+                decision,
+                note,
+              }),
+            ).form({
+              reviewer,
+              decision,
+              note,
+            }),
+          }),
           completions: each(
             CommitmentTracking._completionsByCommitment({
               commitment,
@@ -109,6 +141,29 @@ export const GoalDetail = former(
           ).form({
             completion,
             occurrence,
+            proofs: each(
+              ProofVerifying._proofForOccurrence({
+                commitment,
+                occurrence,
+              }).is({
+                proof,
+              }),
+            ).form({
+              proof,
+              verifications: each(
+                ProofVerifying._verificationsByProof({
+                  proof,
+                }).is({
+                  reviewer,
+                  decision,
+                  note,
+                }),
+              ).form({
+                reviewer,
+                decision,
+                note,
+              }),
+            }),
           }),
         }),
     }),
