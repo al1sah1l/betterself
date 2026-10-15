@@ -47,7 +47,7 @@ gateway.invoke = async (path, input, options) => {
     };
   }
 
-  return invokeGateway(
+  const result = await invokeGateway(
     path,
     {
       ...input,
@@ -55,7 +55,14 @@ gateway.invoke = async (path, input, options) => {
     },
     options,
   );
+
+  if (result.ok) {
+    await gateway.whenIdle();
+  }
+
+  return result;
 };
+
 
 const handler = createHttpHandler({
   application,

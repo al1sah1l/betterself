@@ -207,6 +207,7 @@ onMounted(loadDetail);
             :session="props.session"
             :goal="props.goal"
             :commitment="commitment.commitment"
+            @submitted="loadDetail"
           />
         </li>
       </ul>

@@ -8,6 +8,10 @@ const props = defineProps<{
   commitment: string;
 }>();
 
+const emit = defineEmits<{
+  submitted: [];
+}>();
+
 const occurrence = ref("");
 const evidence = ref("");
 const loading = ref(false);
@@ -18,6 +22,7 @@ async function submitProof() {
   if (loading.value) return;
 
   error.value = "";
+  emit("submitted");
   success.value = "";
 
   const date = new Date(occurrence.value);
