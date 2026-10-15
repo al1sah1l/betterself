@@ -17,6 +17,7 @@ const account = ref("");
 const session = ref("");
 const loading = ref(false);
 const error = ref("");
+const activePage = ref<"goals" | "groups">("goals");
 
 function errorMessage(cause: unknown): string {
   if (cause instanceof ApiError) {
@@ -204,12 +205,40 @@ async function signOut() {
         </button>
       </header>
 
-      <MyGoals :key="session" :session="session" />
-      <MyGroups
-        :key="session"
-        :session="session"
-        :account="account"
-      />
+      <nav class="page-nav" aria-label="Main navigation">
+        <button
+          class="text-button"
+          type="button"
+          :aria-current="activePage === 'goals' ? 'page' : undefined"
+          @click="activePage = 'goals'"
+        >
+          Goals
+        </button>
+
+        <button
+          class="text-button"
+          type="button"
+          :aria-current="activePage === 'groups' ? 'page' : undefined"
+          @click="activePage = 'groups'"
+        >
+          Groups
+        </button>
+      </nav>
+
+      <KeepAlive>
+        <MyGoals
+          v-if="activePage === 'goals'"
+          :key="`goals-${session}`"
+          :session="session"
+        />
+
+        <MyGroups
+          v-else
+          :key="`groups-${session}`"
+          :session="session"
+          :account="account"
+        />
+      </KeepAlive>
     </template>
 
     <p v-if="error" class="error" role="alert">{{ error }}</p>
@@ -364,5 +393,23 @@ button:disabled {
     align-items: flex-start;
     flex-direction: column;
   }
+}
+
+.page-nav {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.page-nav button {
+  margin-top: 0;
+  padding: 12px 4px;
+  border-bottom: 3px solid transparent;
+}
+
+.page-nav button[aria-current="page"] {
+  border-bottom-color: var(--accent);
+  font-weight: 700;
 }
 </style>
