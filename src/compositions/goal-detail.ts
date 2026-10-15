@@ -18,6 +18,7 @@ const {
   Sessioning,
   GoalPlanning,
   CommitmentTracking,
+  AccountabilityGrouping,
 } = concepts;
 
 export const GoalDetail = former(
@@ -31,6 +32,7 @@ export const GoalDetail = former(
       timeline,
       successDefinition,
       currentStrategy,
+      group,
       commitment,
       description,
       recurring,
@@ -51,6 +53,13 @@ export const GoalDetail = former(
           currentStrategy,
         }),
       ),
+      whether(
+        AccountabilityGrouping._groupForGoal({
+          goal,
+        }).is({
+          group,
+        }),
+      ),
     ).form({
       goal,
       outcome,
@@ -59,6 +68,7 @@ export const GoalDetail = former(
       timeline,
       successDefinition,
       currentStrategy,
+      group,
       commitments: each(
         CommitmentTracking._commitmentsByGoal({
           goal,

@@ -253,6 +253,7 @@ test("owner can open a goal without strategy or commitments", async () => {
       goal,
       ...goalContext,
       currentStrategy: null,
+      group: null,
       commitments: [],
     },
   });
@@ -318,7 +319,7 @@ test("invalid session cannot open goal detail", async () => {
   expect(result.ok).toBe(false);
 });
 
-test("goal detail includes saved strategy and only this goal's commitments", async () => {
+test("goal detail includes saved strategy, attached group, and only this goal's commitments", async () => {
   const app = assembleTestApplication();
 
   const session = await createSession(app, "maya");
@@ -365,6 +366,18 @@ test("goal detail includes saved strategy and only this goal's commitments", asy
     schedule: "Every Monday",
   });
 
+  const group = await createGroup(
+    app,
+    "maya",
+    "Career Accountability",
+  );
+
+  await app.concepts.AccountabilityGrouping.attachGoal({
+    group,
+    user: "maya",
+    goal,
+  });
+
   const result = await app.invoker.invoke(
     "/dashboard/goal",
     { session, goal },
@@ -379,6 +392,7 @@ test("goal detail includes saved strategy and only this goal's commitments", asy
       goal,
       ...goalContext,
       currentStrategy: strategy,
+      group,
       commitments: [
         {
           commitment: created.commitment,

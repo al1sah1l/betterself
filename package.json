@@ -4,13 +4,18 @@
   "packageManager": "bun@1.3.4",
   "dependencies": {
     "@mit-sdg/sync-engine": "1.1.0",
-    "mongodb": "^7.7.0"
+    "@mit-sdg/sync-engine-http": "1.1.0",
+    "mongodb": "^7.7.0",
+    "vue": "^3.5.44"
   },
   "devDependencies": {
     "@types/bun": "^1.3.4",
     "@types/node": "^24.0.0",
+    "@vitejs/plugin-vue": "^6.0.10",
     "mongodb-memory-server": "^11.3.0",
-    "typescript": ">=6 <7"
+    "typescript": ">=6 <7",
+    "vite": "^8.3.4",
+    "vue-tsc": "^3.3.13"
   },
   "scripts": {
     "generate": "sync-engine artifacts pin",
@@ -23,7 +28,10 @@
     "db:shell": "podman compose exec mongo mongosh -u dev -p dev",
     "db:check": "bun scripts/check-db.ts",
     "test": "bun test",
-    "test:memory": "TEST_MONGO=memory bun test"
+    "test:memory": "TEST_MONGO=memory bun test",
+    "dev:frontend": "bun --bun vite",
+    "check:frontend": "vue-tsc --noEmit -p frontend/tsconfig.json",
+    "build:frontend": "bun --bun vite build"
   },
   "name": "betterself"
 }

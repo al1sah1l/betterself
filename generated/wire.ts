@@ -3,6 +3,8 @@
 import type { applicationConceptSet as ApplicationConceptSet } from "../src/concepts.ts";
 
 type AtPath<T, P extends readonly string[]> = P extends readonly [infer H extends string, ...infer R extends string[]] ? H extends keyof T ? AtPath<T[H], R> : H extends `${number}` ? T extends readonly (infer Item)[] ? AtPath<Item, R> : never : never : T;
+type QueryRow<T> = T extends readonly (infer Row)[] ? Row : T;
+type AllOf<T extends readonly unknown[]> = T extends readonly [infer Head, ...infer Rest] ? Head & AllOf<Rest> : unknown;
 type OneOf<T extends readonly unknown[]> = T[number];
 type Jsonify<T> = T extends Date ? string : T extends null | boolean | number | string ? T : T extends (...args: never[]) => unknown ? never : T extends readonly (infer Item)[] ? Jsonify<Item>[] : T extends object ? { [K in keyof T]: Jsonify<T[K]> } : never;
 
@@ -65,6 +67,83 @@ export type ApplicationWire = {
       "commitment": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["createCommitment"]>>, ["commitment"]>>;
     };
     error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
+  "/dashboard/goal": {
+    input: {
+      "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "detail": {
+        "commitments": {
+          "active": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["active"]>>;
+          "commitment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["commitment"]>>;
+          "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["description"]>>;
+          "recurring": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["recurring"]>>;
+          "schedule": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["CommitmentTracking"]["_commitmentsByGoal"]>>>, ["schedule"]>>;
+        }[];
+        "constraints": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["constraints"]>>;
+        "currentContext": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["currentContext"]>>;
+        "currentStrategy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["currentStrategy"]>> | null;
+        "goal": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_groupForGoal"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+        "group": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_groupForGoal"]>>>, ["group"]>> | null;
+        "outcome": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["outcome"]>>;
+        "successDefinition": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["successDefinition"]>>;
+        "timeline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>>>, ["timeline"]>>;
+      };
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
+  "/dashboard/goals": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "goals": {
+        "constraints": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goalsByOwner"]>>>, ["constraints"]>>;
+        "currentContext": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goalsByOwner"]>>>, ["currentContext"]>>;
+        "goal": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goalsByOwner"]>>>, ["goal"]>>;
+        "outcome": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goalsByOwner"]>>>, ["outcome"]>>;
+        "successDefinition": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goalsByOwner"]>>>, ["successDefinition"]>>;
+        "timeline": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goalsByOwner"]>>>, ["timeline"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
+  "/dashboard/group-proofs": {
+    input: {
+      "group": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_group"]>[0], ["group"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "proofs": {
+        "commitment": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>>>, ["commitment"]>>;
+        "evidence": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>>>, ["evidence"]>>;
+        "goal": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>>>, ["goal"]>>;
+        "occurrence": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>>>, ["occurrence"]>>;
+        "proof": Jsonify<AllOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>[0], ["proof"]>, AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_sharedProofs"]>>>, ["proof"]>]>>;
+        "submitter": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_proof"]>>>, ["submitter"]>>;
+        "verifications": {
+          "decision": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["decision"]>>;
+          "note": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["note"]>>;
+          "reviewer": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["_verificationsByProof"]>>>, ["reviewer"]>>;
+        }[];
+      }[];
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GROUP_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
+  "/dashboard/groups": {
+    input: {
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "groups": {
+        "group": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_groupsForUser"]>>>, ["group"]>>;
+        "name": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_groupsForUser"]>>>, ["name"]>>;
+        "topic": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["AccountabilityGrouping"]["_groupsForUser"]>>>, ["topic"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
   };
   "/goals/create": {
     input: {

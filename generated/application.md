@@ -188,6 +188,107 @@ Concrete types:
 
 - `TextEvidence` — [BetterSelf Types and Instances](../design/types.md), line 6.
 
+## Views
+
+_Views name reusable conditions. Multiple `where` blocks are alternatives._
+
+### (user) is a member of (group)
+
+Authored path: `BetterSelf.dashboard.GroupMember`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 37.
+
+```view
+(user) is a member of (group) — inputs (user, group); outputs (); bindings ()
+  where AccountabilityGrouping._members (group) has (user)
+```
+
+## Formers
+
+_Formers name result shapes evaluated when asked. The source former owns_
+_the authored explanation; this section records the generated shape._
+
+### the detail of (goal)
+
+Authored path: `BetterSelf.dashboard.GoalDetail`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 24.
+
+```former
+Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active); promises exactly one record — forms:
+  a record of
+    where GoalPlanning._goal (goal) has (constraints, currentContext, outcome, successDefinition, timeline)
+    where whether GoalPlanning._goal (goal) has (currentStrategy)
+    where whether AccountabilityGrouping._groupForGoal (goal) has (group)
+    commitments: each CommitmentTracking._commitmentsByGoal (goal) has (active, commitment, description, recurring, schedule)
+      form a record of
+        active
+        commitment
+        description
+        recurring
+        schedule
+    constraints
+    currentContext
+    currentStrategy
+    goal
+    group
+    outcome
+    successDefinition
+    timeline
+```
+
+### the goals of (user)
+
+Authored path: `BetterSelf.dashboard.MyGoals`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 7.
+
+```former
+Former "the goals of (user)" — inputs (user); bindings (goal, outcome, currentContext, constraints, timeline, successDefinition); promises exactly one record — forms:
+  each GoalPlanning._goalsByOwner (owner: user) has (constraints, currentContext, goal, outcome, successDefinition, timeline)
+    form a record of
+      constraints
+      currentContext
+      goal
+      outcome
+      successDefinition
+      timeline
+```
+
+### the groups of (user)
+
+Authored path: `BetterSelf.dashboard.MyGroups`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 23.
+
+```former
+Former "the groups of (user)" — inputs (user); bindings (group, name, topic); promises exactly one record — forms:
+  each AccountabilityGrouping._groupsForUser (user) has (group, name, topic)
+    form a record of
+      group
+      name
+      topic
+```
+
+### the shared proofs in (group)
+
+Authored path: `BetterSelf.dashboard.GroupProofs`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 39.
+
+```former
+Former "the shared proofs in (group)" — inputs (group); bindings (proof, submitter, goal, commitment, occurrence, evidence, reviewer, decision, note); promises exactly one record — forms:
+  each AccountabilityGrouping._sharedProofs (group) has (proof)
+    where ProofVerifying._proof (proof) has (commitment, evidence, goal, occurrence, submitter)
+    form a record of
+      commitment
+      evidence
+      goal
+      occurrence
+      proof
+      submitter
+      verifications: each ProofVerifying._verificationsByProof (proof) has (decision, note, reviewer)
+        form a record of
+          decision
+          note
+          reviewer
+```
+
 ## Reactions
 
 ### BetterSelf.authentication.CurrentUser
@@ -399,6 +500,175 @@ Authored path: `BetterSelf.completion.RecordCompletionFromProof`.
 when ProofVerifying.submitProof (commitment, occurrence)
 then
   CommitmentTracking.claimComplete (commitment, occurrence)
+```
+
+### BetterSelf.dashboard.GetGoalDetail
+
+Authored path: `BetterSelf.dashboard.GetGoalDetail`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 22.
+- Covered by [Goal Management](../design/compositions/goals.md), line 35.
+
+```reaction
+when RequestBoundary.request (goal, path: "/dashboard/goal", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.dashboard.GetGoalDetail:authorized#2
+
+Authored path: `BetterSelf.dashboard.GetGoalDetail`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 22.
+- Covered by [Goal Management](../design/compositions/goals.md), line 35.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.GetGoalDetail
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/goal", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (detail: former "the detail of (goal)" with (goal), requestId)
+```
+
+### BetterSelf.dashboard.GetGoalDetail:forbidden#2
+
+Authored path: `BetterSelf.dashboard.GetGoalDetail`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 22.
+- Covered by [Goal Management](../design/compositions/goals.md), line 35.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.GetGoalDetail
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/goal", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.dashboard.GetGoalDetail:missingGoal#2
+
+Authored path: `BetterSelf.dashboard.GetGoalDetail`.
+- Covered by [Goal Management](../design/compositions/goals.md), line 22.
+- Covered by [Goal Management](../design/compositions/goals.md), line 35.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.GetGoalDetail
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/goal", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.dashboard.ListGroupProofs
+
+Authored path: `BetterSelf.dashboard.ListGroupProofs`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+
+```reaction
+when RequestBoundary.request (group, path: "/dashboard/group-proofs", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.dashboard.ListGroupProofs:authorized#2
+
+Authored path: `BetterSelf.dashboard.ListGroupProofs`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
+where
+  earlier, RequestBoundary.request (group, path: "/dashboard/group-proofs", requestId, session)
+  AccountabilityGrouping._group (group)
+  view "(user) is a member of (group)" with (group, user)
+then
+  RequestBoundary.respond (proofs: former "the shared proofs in (group)" with (group), requestId)
+```
+
+### BetterSelf.dashboard.ListGroupProofs:forbidden#2
+
+Authored path: `BetterSelf.dashboard.ListGroupProofs`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
+where
+  earlier, RequestBoundary.request (group, path: "/dashboard/group-proofs", requestId, session)
+  AccountabilityGrouping._group (group)
+  no view "(user) is a member of (group)" with (group, user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.dashboard.ListGroupProofs:missingGroup#2
+
+Authored path: `BetterSelf.dashboard.ListGroupProofs`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 50.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
+where
+  earlier, RequestBoundary.request (group, path: "/dashboard/group-proofs", requestId, session)
+  no AccountabilityGrouping._group (group)
+then
+  RequestBoundary.respond (error: "GROUP_NOT_FOUND", requestId)
+```
+
+### BetterSelf.dashboard.ListMyGoals
+
+Authored path: `BetterSelf.dashboard.ListMyGoals`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 3.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 14.
+
+```reaction
+when RequestBoundary.request (path: "/dashboard/goals", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.dashboard.ListMyGoals#2
+
+Authored path: `BetterSelf.dashboard.ListMyGoals`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 3.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 14.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListMyGoals
+where
+  earlier, RequestBoundary.request (path: "/dashboard/goals", requestId, session)
+then
+  RequestBoundary.respond (goals: former "the goals of (user)" with (user), requestId)
+```
+
+### BetterSelf.dashboard.ListMyGroups
+
+Authored path: `BetterSelf.dashboard.ListMyGroups`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 19.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 30.
+
+```reaction
+when RequestBoundary.request (path: "/dashboard/groups", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.dashboard.ListMyGroups#2
+
+Authored path: `BetterSelf.dashboard.ListMyGroups`.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 19.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 30.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListMyGroups
+where
+  earlier, RequestBoundary.request (path: "/dashboard/groups", requestId, session)
+then
+  RequestBoundary.respond (groups: former "the groups of (user)" with (user), requestId)
 ```
 
 ### BetterSelf.goals.CreateGoal
@@ -958,6 +1228,10 @@ not listed here have no explicit input contract.
 - `/auth/sign-in` — requires `username`, `password`
 - `/auth/sign-out` — requires `session`
 - `/commitments/create` — requires `session`, `goal`, `description`, `recurring`, `schedule`
+- `/dashboard/goal` — requires `session`, `goal`
+- `/dashboard/goals` — requires `session`
+- `/dashboard/group-proofs` — requires `session`, `group`
+- `/dashboard/groups` — requires `session`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/groups/attach-goal` — requires `session`, `group`, `goal`
