@@ -13,8 +13,14 @@ import {
   SetStrategy,
 } from "./compositions/goals.ts";
 
-import {CreateCommitment} from "./compositions/comitments.ts";
-import { SubmitProof, DeletePendingProof } from "./compositions/proofs.ts";
+import {
+  CreateCommitment,
+} from "./compositions/comitments.ts";
+
+import {
+  SubmitProof,
+  DeletePendingProof,
+} from "./compositions/proofs.ts";
 
 import {
   CreateGroup,
@@ -22,10 +28,22 @@ import {
   AttachGoal,
 } from "./compositions/groups.ts";
 
-import { RecordCompletionFromProof } from "./compositions/completion.ts";
-import { ShareProofWithGroup, UnshareDeletedProof, } from "./compositions/proof-sharing.ts";
-import { ReviewProof } from "./compositions/verification.ts";
-import { ProposeStrategy } from "./compositions/strategy-proposal.ts";
+import {
+  RecordCompletionFromProof,
+} from "./compositions/completion.ts";
+
+import {
+  ShareProofWithGroup,
+  UnshareDeletedProof,
+} from "./compositions/proof-sharing.ts";
+
+import {
+  ReviewProof,
+} from "./compositions/verification.ts";
+
+import {
+  ProposeStrategy,
+} from "./compositions/strategy-proposal.ts";
 
 import {
   ListMyGoals,
@@ -47,6 +65,13 @@ import {
   GroupProofs,
   ListGroupProofs,
 } from "./compositions/group-proofs.ts";
+
+import {
+  GoalResults,
+  RecordResult,
+  ListGoalResults,
+  RemoveResult,
+} from "./compositions/results.ts";
 
 import { db } from "./db.ts";
 
@@ -101,9 +126,16 @@ export function assembleApplication() {
           JoinGroup,
           AttachGoal,
         },
-        
+
         strategyProposal: {
           ProposeStrategy,
+        },
+
+        results: {
+          GoalResults,
+          RecordResult,
+          ListGoalResults,
+          RemoveResult,
         },
 
         dashboard: {

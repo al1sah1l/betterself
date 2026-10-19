@@ -169,6 +169,20 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "INVALID_INPUT" | "UNKNOWN_SESSION" };
   };
+  "/dashboard/results": {
+    input: {
+      "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "results": {
+        "description": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["_resultsByGoal"]>>>, ["description"]>>;
+        "observedOn": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["_resultsByGoal"]>>>, ["observedOn"]>>;
+        "result": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["_resultsByGoal"]>>>, ["result"]>>;
+      }[];
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
   "/goals/create": {
     input: {
       "constraints": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["createGoal"]>[0], ["constraints"]>>;
@@ -264,6 +278,29 @@ export type ApplicationWire = {
       "proof": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ProofVerifying"]["submitProof"]>>, ["proof"]>>;
     };
     error: { error: AppWideError | "COMMITMENT_GOAL_MISMATCH" | "COMMITMENT_NOT_FOUND" | "COMMITMENT_RETIRED" | "COMPLETION_ALREADY_CLAIMED" | "EVIDENCE_REQUIRED" | "FORBIDDEN" | "GOAL_NOT_ATTACHED" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "ONE_TIME_ALREADY_COMPLETED" | "PROOF_ALREADY_SHARED" | "PROOF_ALREADY_SUBMITTED" | "UNKNOWN_SESSION" };
+  };
+  "/results/record": {
+    input: {
+      "description": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["recordResult"]>[0], ["description"]>>;
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["recordResult"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "observedOn": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["recordResult"]>[0], ["observedOn"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "result": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["recordResult"]>>, ["result"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "INVALID_RESULT" | "UNKNOWN_SESSION" };
+  };
+  "/results/remove": {
+    input: {
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["removeResult"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "result": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["removeResult"]>[0], ["result"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "result": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["ResultTracking"]["removeResult"]>[0], ["result"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "RESULT_NOT_FOUND" | "UNKNOWN_SESSION" };
   };
   "/strategies/propose": {
     input: {

@@ -3,8 +3,10 @@ import { assembleApplication } from "./src/assembly.ts";
 export default {
   assemble: assembleApplication,
   title: "Application",
+
   design: {
     version: 1,
+
     documents: [
       new URL("./design/types.md", import.meta.url),
       new URL("./design/compositions/completion.md", import.meta.url),
@@ -17,6 +19,7 @@ export default {
       new URL("./design/compositions/groups.md", import.meta.url),
       new URL("./design/compositions/strategy-proposal.md", import.meta.url),
       new URL("./design/compositions/dashboard.md", import.meta.url),
+      new URL("./design/compositions/results.md", import.meta.url),
     ],
   },
 };

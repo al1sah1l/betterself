@@ -7,6 +7,7 @@ import { proofVerifying } from "./concepts/ProofVerifying/ProofVerifying.registr
 import { accountabilityGrouping } from "./concepts/AccountabilityGrouping/AccountabilityGrouping.registry.ts";
 import { sessioning } from "./concepts/Sessioning/Sessioning.registry.ts";
 import { reasoning } from "./concepts/Reasoning/Reasoning.registry.ts";
+import { resultTracking } from "./concepts/ResultTracking/ResultTracking.registry.ts";
 
 export const applicationConceptSet = conceptSet({
   Authenticating: authenticating,
@@ -16,6 +17,7 @@ export const applicationConceptSet = conceptSet({
   AccountabilityGrouping: accountabilityGrouping,
   Sessioning: sessioning,
   Reasoning: reasoning,
+  ResultTracking: resultTracking,
 });
 
 export const { concepts } = applicationConceptSet;

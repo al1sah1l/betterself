@@ -165,7 +165,27 @@ Defined in [Reasoning](../design/concepts/Reasoning.md), line 1.
 
 #### Instances
 
-- `Reasoning` — instance of `Reasoning` — [BetterSelf Types and Instances](../design/types.md), line 35.
+- `Reasoning` — instance of `Reasoning` — [BetterSelf Types and Instances](../design/types.md), line 38.
+
+### ResultTracking
+
+Defined in [ResultTracking](../design/concepts/ResultTracking.md), line 1.
+
+#### Actions
+
+- `recordResult(goal: Goal, description: String, observedOn: String) : returns (result: Result)`
+  - Refuses `INVALID_RESULT`: Enter a valid date and a result of 1–2000 characters.
+- `removeResult(goal: Goal, result: Result) : returns (result: Result)`
+  - Refuses `RESULT_NOT_FOUND`: There is no such result for this goal.
+
+#### Queries
+
+- `_resultsByGoal(goal: Goal) : many (result: Result, description: String, observedOn: String)`
+
+#### Instances
+
+- `ResultTracking` — instance of `ResultTracking` — [BetterSelf Types and Instances](../design/types.md), line 35.
+  - `Goal` is `GoalPlanning.Goal` — [BetterSelf Types and Instances](../design/types.md), line 36.
 
 ### Sessioning
 
@@ -294,6 +314,20 @@ Former "the groups of (user)" — inputs (user); bindings (group, name, topic); 
       group
       name
       topic
+```
+
+### the observed results of (goal)
+
+Authored path: `BetterSelf.results.GoalResults`.
+- Covered by [Observed Results](../design/compositions/results.md), line 17.
+
+```former
+Former "the observed results of (goal)" — inputs (goal); bindings (result, description, observedOn); promises exactly one record — forms:
+  each ResultTracking._resultsByGoal (goal) has (description, observedOn, result)
+    form a record of
+      description
+      observedOn
+      result
 ```
 
 ### the shared proofs in (group)
@@ -1252,6 +1286,208 @@ then
   RequestBoundary.respond (error: "COMMITMENT_GOAL_MISMATCH", requestId)
 ```
 
+### BetterSelf.results.ListGoalResults
+
+Authored path: `BetterSelf.results.ListGoalResults`.
+- Covered by [Observed Results](../design/compositions/results.md), line 13.
+- Covered by [Observed Results](../design/compositions/results.md), line 21.
+
+```reaction
+when RequestBoundary.request (goal, path: "/dashboard/results", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.results.ListGoalResults:authorized#2
+
+Authored path: `BetterSelf.results.ListGoalResults`.
+- Covered by [Observed Results](../design/compositions/results.md), line 13.
+- Covered by [Observed Results](../design/compositions/results.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.ListGoalResults
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/results", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (requestId, results: former "the observed results of (goal)" with (goal))
+```
+
+### BetterSelf.results.ListGoalResults:forbidden#2
+
+Authored path: `BetterSelf.results.ListGoalResults`.
+- Covered by [Observed Results](../design/compositions/results.md), line 13.
+- Covered by [Observed Results](../design/compositions/results.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.ListGoalResults
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/results", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.results.ListGoalResults:missing#2
+
+Authored path: `BetterSelf.results.ListGoalResults`.
+- Covered by [Observed Results](../design/compositions/results.md), line 13.
+- Covered by [Observed Results](../design/compositions/results.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.ListGoalResults
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/results", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.results.RecordResult
+
+Authored path: `BetterSelf.results.RecordResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 11.
+- Covered by [Observed Results](../design/compositions/results.md), line 20.
+
+```reaction
+when RequestBoundary.request (description, goal, observedOn, path: "/results/record", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.results.RecordResult:authorized#2
+
+Authored path: `BetterSelf.results.RecordResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 11.
+- Covered by [Observed Results](../design/compositions/results.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.RecordResult
+where
+  earlier, RequestBoundary.request (description, goal, observedOn, path: "/results/record", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  ResultTracking.recordResult (description, goal, observedOn)
+```
+
+### BetterSelf.results.RecordResult:authorized#3
+
+Authored path: `BetterSelf.results.RecordResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 11.
+- Covered by [Observed Results](../design/compositions/results.md), line 20.
+
+```reaction
+when ResultTracking.recordResult (description, goal, observedOn, result), asked by BetterSelf.results.RecordResult:authorized#2
+where
+  earlier, RequestBoundary.request (description, goal, observedOn, path: "/results/record", requestId, session)
+then
+  RequestBoundary.respond (requestId, result)
+```
+
+### BetterSelf.results.RecordResult:forbidden#2
+
+Authored path: `BetterSelf.results.RecordResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 11.
+- Covered by [Observed Results](../design/compositions/results.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.RecordResult
+where
+  earlier, RequestBoundary.request (description, goal, observedOn, path: "/results/record", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.results.RecordResult:missing#2
+
+Authored path: `BetterSelf.results.RecordResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 11.
+- Covered by [Observed Results](../design/compositions/results.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.RecordResult
+where
+  earlier, RequestBoundary.request (description, goal, observedOn, path: "/results/record", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.results.RemoveResult
+
+Authored path: `BetterSelf.results.RemoveResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 15.
+- Covered by [Observed Results](../design/compositions/results.md), line 22.
+
+```reaction
+when RequestBoundary.request (goal, path: "/results/remove", requestId, result, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.results.RemoveResult:authorized#2
+
+Authored path: `BetterSelf.results.RemoveResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 15.
+- Covered by [Observed Results](../design/compositions/results.md), line 22.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.RemoveResult
+where
+  earlier, RequestBoundary.request (goal, path: "/results/remove", requestId, result, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  ResultTracking.removeResult (goal, result)
+```
+
+### BetterSelf.results.RemoveResult:authorized#3
+
+Authored path: `BetterSelf.results.RemoveResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 15.
+- Covered by [Observed Results](../design/compositions/results.md), line 22.
+
+```reaction
+when ResultTracking.removeResult (goal, result), asked by BetterSelf.results.RemoveResult:authorized#2
+where
+  earlier, RequestBoundary.request (goal, path: "/results/remove", requestId, result, session)
+then
+  RequestBoundary.respond (requestId, result)
+```
+
+### BetterSelf.results.RemoveResult:forbidden#2
+
+Authored path: `BetterSelf.results.RemoveResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 15.
+- Covered by [Observed Results](../design/compositions/results.md), line 22.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.RemoveResult
+where
+  earlier, RequestBoundary.request (goal, path: "/results/remove", requestId, result, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.results.RemoveResult:missing#2
+
+Authored path: `BetterSelf.results.RemoveResult`.
+- Covered by [Observed Results](../design/compositions/results.md), line 15.
+- Covered by [Observed Results](../design/compositions/results.md), line 22.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.results.RemoveResult
+where
+  earlier, RequestBoundary.request (goal, path: "/results/remove", requestId, result, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
 ### BetterSelf.strategyProposal.ProposeStrategy
 
 Authored path: `BetterSelf.strategyProposal.ProposeStrategy`.
@@ -1430,6 +1666,7 @@ not listed here have no explicit input contract.
 - `/dashboard/goals` — requires `session`
 - `/dashboard/group-proofs` — requires `session`, `group`
 - `/dashboard/groups` — requires `session`
+- `/dashboard/results` — requires `session`, `goal`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/groups/attach-goal` — requires `session`, `group`, `goal`
@@ -1438,4 +1675,6 @@ not listed here have no explicit input contract.
 - `/proofs/delete` — requires `session`, `proof`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`
 - `/proofs/submit` — requires `session`, `goal`, `commitment`, `occurrence`, `evidence`
+- `/results/record` — requires `session`, `goal`, `description`, `observedOn`
+- `/results/remove` — requires `session`, `goal`, `result`
 - `/strategies/propose` — requires `session`, `goal`

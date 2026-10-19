@@ -68,6 +68,7 @@ gateway.invoke = async (path, input, options) => {
 const handler = createHttpHandler({
   application,
   gateway,
+
   policy: httpPolicy({
     basePath: "/api",
 
@@ -96,6 +97,8 @@ const handler = createHttpHandler({
       PROOF_ALREADY_REVIEWED: "CONFLICT",
       EVIDENCE_REQUIRED: "INVALID_REQUEST",
       INVALID_OCCURRENCE: "INVALID_REQUEST",
+      NOT_PROOF_SUBMITTER: "FORBIDDEN",
+      PROOF_HAS_REVIEWS: "CONFLICT",
 
       GROUP_NOT_FOUND: "NOT_FOUND",
       ALREADY_MEMBER: "CONFLICT",
@@ -104,8 +107,8 @@ const handler = createHttpHandler({
       GOAL_NOT_ATTACHED: "CONFLICT",
       PROOF_ALREADY_SHARED: "CONFLICT",
 
-      NOT_PROOF_SUBMITTER: "FORBIDDEN",
-      PROOF_HAS_REVIEWS: "CONFLICT",
+      INVALID_RESULT: "INVALID_REQUEST",
+      RESULT_NOT_FOUND: "NOT_FOUND",
     },
   }),
 });

@@ -32,5 +32,8 @@ instantiate AccountabilityGrouping with
   Goal is GoalPlanning.Goal
   Proof is ProofVerifying.Proof
 
+instantiate ResultTracking with
+  Goal is GoalPlanning.Goal
+
 instantiate Reasoning
 ```
