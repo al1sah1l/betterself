@@ -1001,6 +1001,184 @@ then
   RequestBoundary.respond (group, requestId)
 ```
 
+### BetterSelf.planManagement.RetireCommitment
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.planManagement.RetireCommitment:authorized#2
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.RetireCommitment
+where
+  earlier, RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+  CommitmentTracking._commitment (commitment) has (goal)
+then
+  CommitmentTracking.retireCommitment (commitment)
+```
+
+### BetterSelf.planManagement.RetireCommitment:authorized#3
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when CommitmentTracking.retireCommitment (commitment), asked by BetterSelf.planManagement.RetireCommitment:authorized#2
+where
+  earlier, RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+then
+  RequestBoundary.respond (commitment, requestId)
+```
+
+### BetterSelf.planManagement.RetireCommitment:forbidden#2
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.RetireCommitment
+where
+  earlier, RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.planManagement.RetireCommitment:missingCommitment#2
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.RetireCommitment
+where
+  earlier, RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+  no CommitmentTracking._commitment (commitment)
+then
+  RequestBoundary.respond (error: "COMMITMENT_NOT_FOUND", requestId)
+```
+
+### BetterSelf.planManagement.RetireCommitment:missingGoal#2
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.RetireCommitment
+where
+  earlier, RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.planManagement.RetireCommitment:wrongGoal#2
+
+Authored path: `BetterSelf.planManagement.RetireCommitment`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 9.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 21.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.RetireCommitment
+where
+  earlier, RequestBoundary.request (commitment, goal, path: "/commitments/retire", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+  CommitmentTracking._commitment (commitment)
+  no CommitmentTracking._commitment (commitment) has (goal)
+then
+  RequestBoundary.respond (error: "COMMITMENT_GOAL_MISMATCH", requestId)
+```
+
+### BetterSelf.planManagement.UpdateGoal
+
+Authored path: `BetterSelf.planManagement.UpdateGoal`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 3.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 20.
+
+```reaction
+when RequestBoundary.request (constraints, currentContext, goal, outcome, path: "/goals/update", requestId, session, successDefinition, timeline)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.planManagement.UpdateGoal:authorized#2
+
+Authored path: `BetterSelf.planManagement.UpdateGoal`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 3.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.UpdateGoal
+where
+  earlier, RequestBoundary.request (constraints, currentContext, goal, outcome, path: "/goals/update", requestId, session, successDefinition, timeline)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  GoalPlanning.updateGoal (constraints, currentContext, goal, outcome, successDefinition, timeline)
+```
+
+### BetterSelf.planManagement.UpdateGoal:authorized#3
+
+Authored path: `BetterSelf.planManagement.UpdateGoal`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 3.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 20.
+
+```reaction
+when GoalPlanning.updateGoal (constraints, currentContext, goal, outcome, successDefinition, timeline), asked by BetterSelf.planManagement.UpdateGoal:authorized#2
+where
+  earlier, RequestBoundary.request (constraints, currentContext, goal, outcome, path: "/goals/update", requestId, session, successDefinition, timeline)
+then
+  RequestBoundary.respond (goal, requestId)
+```
+
+### BetterSelf.planManagement.UpdateGoal:forbidden#2
+
+Authored path: `BetterSelf.planManagement.UpdateGoal`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 3.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.UpdateGoal
+where
+  earlier, RequestBoundary.request (constraints, currentContext, goal, outcome, path: "/goals/update", requestId, session, successDefinition, timeline)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.planManagement.UpdateGoal:missing#2
+
+Authored path: `BetterSelf.planManagement.UpdateGoal`.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 3.
+- Covered by [Plan Management](../design/compositions/plan-management.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.planManagement.UpdateGoal
+where
+  earlier, RequestBoundary.request (constraints, currentContext, goal, outcome, path: "/goals/update", requestId, session, successDefinition, timeline)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
 ### BetterSelf.proofSharing.ShareProofWithGroup
 
 Authored path: `BetterSelf.proofSharing.ShareProofWithGroup`.
@@ -1662,6 +1840,7 @@ not listed here have no explicit input contract.
 - `/auth/sign-in` — requires `username`, `password`
 - `/auth/sign-out` — requires `session`
 - `/commitments/create` — requires `session`, `goal`, `description`, `recurring`, `schedule`; fills `sourceStep` with "" when absent
+- `/commitments/retire` — requires `session`, `goal`, `commitment`
 - `/dashboard/goal` — requires `session`, `goal`
 - `/dashboard/goals` — requires `session`
 - `/dashboard/group-proofs` — requires `session`, `group`
@@ -1669,6 +1848,7 @@ not listed here have no explicit input contract.
 - `/dashboard/results` — requires `session`, `goal`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
+- `/goals/update` — requires `session`, `goal`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/groups/attach-goal` — requires `session`, `group`, `goal`
 - `/groups/create` — requires `session`, `name`, `topic`
 - `/groups/join` — requires `session`, `group`

@@ -94,7 +94,9 @@ function useStrategyStep(step: StrategyStep, index: number) {
 function hasCommitmentForStep(index: number): boolean {
   return (
     detail.value?.commitments.some(
-      (commitment) => commitment.sourceStep === `step:${index}`,
+      (commitment) =>
+        commitment.active &&
+        commitment.sourceStep === `step:${index}`,
     ) ?? false
   );
 }

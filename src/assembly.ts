@@ -73,6 +73,11 @@ import {
   RemoveResult,
 } from "./compositions/results.ts";
 
+import {
+  UpdateGoal,
+  RetireCommitment,
+} from "./compositions/plan-management.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -136,6 +141,11 @@ export function assembleApplication() {
           RecordResult,
           ListGoalResults,
           RemoveResult,
+        },
+
+        planManagement: {
+          UpdateGoal,
+          RetireCommitment,
         },
 
         dashboard: {
