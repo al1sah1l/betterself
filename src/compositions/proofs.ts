@@ -56,6 +56,7 @@ export const SubmitProof = endpoint(
           }).is({
             goal,
             recurring: true,
+            active: true,
           }),
         )
           .then(
@@ -87,6 +88,7 @@ export const SubmitProof = endpoint(
           }).is({
             goal,
             recurring: false,
+            active: true,
           }),
           no(
             CommitmentTracking._completionsByCommitment({
@@ -123,6 +125,7 @@ export const SubmitProof = endpoint(
           }).is({
             goal,
             recurring: false,
+            active: true,
           }),
           CommitmentTracking._completionsByCommitment({
             commitment,
@@ -165,6 +168,7 @@ export const SubmitProof = endpoint(
           }).is({
             goal,
             recurring: false,
+            active: true,
           }),
           CommitmentTracking._completionsByCommitment({
             commitment,
@@ -195,6 +199,7 @@ export const SubmitProof = endpoint(
           }).is({
             goal,
             recurring: false,
+            active: true,
           }),
           CommitmentTracking._completionsByCommitment({
             commitment,
@@ -212,6 +217,18 @@ export const SubmitProof = endpoint(
             }),
           )
           .named("existingProof"),
+
+        where(
+          GoalPlanning._goal({ goal }).is({ owner: user }),
+          CommitmentTracking._commitment({ commitment }).is({
+            goal,
+            active: false,
+          }),
+        )
+          .then(
+            respond({ error: "COMMITMENT_RETIRED" }),
+          )
+          .named("retiredCommitment"),
 
         where(
           no(

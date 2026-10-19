@@ -79,7 +79,7 @@ describe("Reasoning", () => {
     const reasoning =
       new ReasoningConcept(async () => []);
 
-    expect(
+    await expect(
       reasoning.proposeStrategy({
         outcome: "Read more",
         currentContext: "I rarely read now.",
@@ -102,7 +102,7 @@ describe("Reasoning", () => {
         },
       ]);
 
-    expect(
+    await expect(
       reasoning.proposeStrategy({
         outcome: "Read more",
         currentContext: "I rarely read now.",
@@ -125,7 +125,7 @@ describe("Reasoning", () => {
         },
       ]);
 
-    expect(
+    await expect(
       reasoning.proposeStrategy({
         outcome: "Read more",
         currentContext: "I rarely read now.",

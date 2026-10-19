@@ -11,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   created: [commitment: string];
+  busy: [value: boolean];
 }>();
 
 const description = ref(props.initialDescription ?? "");
@@ -30,6 +31,7 @@ async function createCommitment() {
   }
 
   loading.value = true;
+  emit("busy", true);
 
   try {
     const result = await api<{ commitment: string }>(
@@ -69,6 +71,7 @@ async function createCommitment() {
     }
   } finally {
     loading.value = false;
+    emit("busy", false);
   }
 }
 </script>

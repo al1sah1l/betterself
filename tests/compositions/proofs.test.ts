@@ -654,23 +654,6 @@ test("another user cannot delete pending proof", async () => {
       proof,
     });
 
-  console.log("DELETE REFUSAL:", result);
-
-  expect(
-    await app.concepts.ProofVerifying._proof({ proof }),
-  ).toHaveLength(1);
-});
-
-test("another user cannot delete pending proof", async () => {
-  const app = assembleTestApplication();
-  const { proof } = await createPendingProof(app);
-
-  const result =
-    await app.concepts.ProofVerifying.deletePendingProof({
-      submitter: "alex",
-      proof,
-    });
-
   expect(result).toEqual({
     error: "NOT_PROOF_SUBMITTER",
     detail: "Only the submitter can delete this proof.",
@@ -1013,4 +996,43 @@ test("deleted proof can be replaced for the same one-time completion claim", asy
       commitment,
     }),
   ).toEqual(proofs);
+});
+
+
+test("retired commitment refuses proof without storing proof or completion", async () => {
+  const app = assembleTestApplication();
+  const goal = await createGoal(app, "maya");
+  const session = await createSession(app, "maya");
+
+  for (const recurring of [false, true]) {
+    const created = await app.concepts.CommitmentTracking.createCommitment({
+      goal,
+      description: "An action that has been retired",
+      recurring,
+      schedule: "Every Monday",
+    });
+    if (
+      typeof created !== "object" ||
+      created === null ||
+      !("commitment" in created) ||
+      typeof created.commitment !== "string"
+    ) {
+      throw new Error("Could not create commitment.");
+    }
+    const commitment = created.commitment;
+    await app.concepts.CommitmentTracking.retireCommitment({ commitment });
+
+    const result = await app.invoker.invoke("/proofs/submit", {
+      session, goal, commitment, occurrence, evidence,
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: { kind: "domain", value: "COMMITMENT_RETIRED" },
+    });
+    await app.whenIdle();
+    expect(await app.concepts.ProofVerifying._proofsByCommitment({ commitment }))
+      .toEqual([]);
+    expect(await app.concepts.CommitmentTracking._completionsByCommitment({ commitment }))
+      .toEqual([]);
+  }
 });

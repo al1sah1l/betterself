@@ -8,7 +8,9 @@ It resolves the session to the authenticated account, verifies that the goal bel
 
 The submitter identity is derived from the session and is not accepted from the client.
 
-Before storing proof for a one-time commitment, the endpoint checks that the commitment has no completion claim. Otherwise, it returns `ONE_TIME_ALREADY_COMPLETED` without creating another proof.
+Proof submission requires an active commitment. A retired commitment returns `COMMITMENT_RETIRED` before storing proof or recording completion.
+
+For a one-time commitment without a completion claim, the owner may submit initial proof. Existing completion claims follow the replacement rules below.
 
 If the goal does not exist, the endpoint returns `GOAL_NOT_FOUND`. If the goal belongs to another account, it returns `FORBIDDEN`. If the commitment does not exist, it returns `COMMITMENT_NOT_FOUND`. If the commitment belongs to a different goal, it returns `COMMITMENT_GOAL_MISMATCH`.
 
