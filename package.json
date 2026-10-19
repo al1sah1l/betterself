@@ -1,7 +1,7 @@
 {
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.3.4",
+  "packageManager": "bun@1.4.2",
   "dependencies": {
     "@mit-sdg/sync-engine": "1.1.0",
     "@mit-sdg/sync-engine-http": "1.1.0",
@@ -31,7 +31,9 @@
     "test:memory": "TEST_MONGO=memory bun test",
     "dev:frontend": "bun --bun vite",
     "check:frontend": "vue-tsc --noEmit -p frontend/tsconfig.json",
-    "build:frontend": "bun --bun vite build"
+    "build:frontend": "bun --bun vite build",
+    "build": "bun run build:frontend",
+    "preview": "bun run db:up && bun run build && NODE_ENV=production bun run start"
   },
   "name": "betterself"
 }

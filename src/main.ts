@@ -3,6 +3,8 @@ import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
 
 import { assembleApplication } from "./assembly.ts";
+import { db } from "./db.ts";
+import { serveFrontend } from "./http/frontend.ts";
 
 const application = assembleApplication();
 
@@ -63,55 +65,82 @@ gateway.invoke = async (path, input, options) => {
   return result;
 };
 
-
 const handler = createHttpHandler({
   application,
   gateway,
   policy: httpPolicy({
     basePath: "/api",
+
     publicErrors: {
-        INVALID_USERNAME: "INVALID_REQUEST",
-        WEAK_PASSWORD: "INVALID_REQUEST",
-        USERNAME_TAKEN: "CONFLICT",
-        INVALID_CREDENTIALS: "UNAUTHORIZED",
-        UNKNOWN_SESSION: "UNAUTHORIZED",
+      INVALID_USERNAME: "INVALID_REQUEST",
+      WEAK_PASSWORD: "INVALID_REQUEST",
+      USERNAME_TAKEN: "CONFLICT",
+      INVALID_CREDENTIALS: "UNAUTHORIZED",
+      UNKNOWN_SESSION: "UNAUTHORIZED",
 
-        GOAL_NOT_FOUND: "NOT_FOUND",
-        FORBIDDEN: "FORBIDDEN",
-        STRATEGY_ALREADY_SET: "CONFLICT",
-        STRATEGY_NOT_SET: "CONFLICT",
+      GOAL_NOT_FOUND: "NOT_FOUND",
+      FORBIDDEN: "FORBIDDEN",
+      STRATEGY_ALREADY_SET: "CONFLICT",
+      STRATEGY_NOT_SET: "CONFLICT",
 
-        COMMITMENT_NOT_FOUND: "NOT_FOUND",
-        COMMITMENT_GOAL_MISMATCH: "INVALID_REQUEST",
-        COMMITMENT_RETIRED: "CONFLICT",
-        COMPLETION_ALREADY_CLAIMED: "CONFLICT",
-        COMMITMENT_ALREADY_RETIRED: "CONFLICT",
-        ONE_TIME_ALREADY_COMPLETED: "CONFLICT",
+      COMMITMENT_NOT_FOUND: "NOT_FOUND",
+      COMMITMENT_GOAL_MISMATCH: "INVALID_REQUEST",
+      COMMITMENT_RETIRED: "CONFLICT",
+      COMPLETION_ALREADY_CLAIMED: "CONFLICT",
+      COMMITMENT_ALREADY_RETIRED: "CONFLICT",
+      ONE_TIME_ALREADY_COMPLETED: "CONFLICT",
 
-        PROOF_ALREADY_SUBMITTED: "CONFLICT",
-        PROOF_NOT_FOUND: "NOT_FOUND",
-        CANNOT_REVIEW_OWN_PROOF: "FORBIDDEN",
-        PROOF_ALREADY_REVIEWED: "CONFLICT",
-        EVIDENCE_REQUIRED: "INVALID_REQUEST",
-        INVALID_OCCURRENCE: "INVALID_REQUEST",
+      PROOF_ALREADY_SUBMITTED: "CONFLICT",
+      PROOF_NOT_FOUND: "NOT_FOUND",
+      CANNOT_REVIEW_OWN_PROOF: "FORBIDDEN",
+      PROOF_ALREADY_REVIEWED: "CONFLICT",
+      EVIDENCE_REQUIRED: "INVALID_REQUEST",
+      INVALID_OCCURRENCE: "INVALID_REQUEST",
 
-        GROUP_NOT_FOUND: "NOT_FOUND",
-        ALREADY_MEMBER: "CONFLICT",
-        NOT_GROUP_MEMBER: "FORBIDDEN",
-        GOAL_ALREADY_ATTACHED: "CONFLICT",
-        GOAL_NOT_ATTACHED: "CONFLICT",
-        PROOF_ALREADY_SHARED: "CONFLICT",
+      GROUP_NOT_FOUND: "NOT_FOUND",
+      ALREADY_MEMBER: "CONFLICT",
+      NOT_GROUP_MEMBER: "FORBIDDEN",
+      GOAL_ALREADY_ATTACHED: "CONFLICT",
+      GOAL_NOT_ATTACHED: "CONFLICT",
+      PROOF_ALREADY_SHARED: "CONFLICT",
 
-        NOT_PROOF_SUBMITTER: "FORBIDDEN",
-        PROOF_HAS_REVIEWS: "CONFLICT",
+      NOT_PROOF_SUBMITTER: "FORBIDDEN",
+      PROOF_HAS_REVIEWS: "CONFLICT",
     },
   }),
 });
 
 const server = Bun.serve({
-  hostname: "localhost",
-  port: 3000,
-  fetch: handler,
+  hostname: process.env.HOST ?? "127.0.0.1",
+  port: Number(process.env.PORT ?? 3000),
+
+  async fetch(request) {
+    const path = new URL(request.url).pathname;
+
+    if (path === "/health") {
+      try {
+        await db.command(
+          { ping: 1 },
+          { timeoutMS: 3000 },
+        );
+
+        return Response.json({
+          status: "ok",
+        });
+      } catch {
+        return Response.json(
+          { status: "unavailable" },
+          { status: 503 },
+        );
+      }
+    }
+
+    if (path === "/api" || path.startsWith("/api/")) {
+      return handler(request);
+    }
+
+    return serveFrontend(request);
+  },
 });
 
-console.log(`BetterSelf API listening on ${server.url}`);
+console.log(`BetterSelf listening on ${server.url}`);
