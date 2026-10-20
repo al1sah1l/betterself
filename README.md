@@ -163,3 +163,7 @@ The deployed database starts empty. Local data remains on the local machine.
 My design notebook and personal reflections are kept in my private individual repository:
 
 [Design Notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md)
+
+## Visual Design Study (P3 Beta)
+
+[View Visual Design Study (Typography & Color)](docs/BetterSelf_Visual_Design_Study_Beta_UI_Updated.pdf)
