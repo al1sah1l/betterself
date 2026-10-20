@@ -66,6 +66,24 @@ reviseStrategy(goal: Goal, strategy: Strategy) : returns (goal: Goal)
   then
     refuses STRATEGY_NOT_SET "This goal does not have a strategy yet."
 
+acceptStrategyRevision(goal: Goal, strategy: Strategy, expectedRevision: String) : returns (goal: Goal)
+  where strategy has 1 to 20 steps with nonempty descriptions and success criteria and expectedRevision matches the goal's current revision and the goal has a strategy
+  then
+    atomically replace the strategy with trimmed proposed steps and assign a fresh revision identity
+    returns goal
+  where strategy or expectedRevision is invalid
+  then
+    refuses INVALID_STRATEGY "Enter a valid strategy and revision identity."
+  where goal is not in Goals
+  then
+    refuses GOAL_NOT_FOUND "There is no such goal."
+  where goal has no currentStrategy
+  then
+    refuses STRATEGY_NOT_SET "This goal does not have a strategy yet."
+  where expectedRevision does not match the current revision
+  then
+    refuses STRATEGY_CHANGED "The strategy changed. Generate a new review before applying it."
+
 updateGoal(goal: Goal, outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String) : returns (goal: Goal)
   where goal is in Goals
   then

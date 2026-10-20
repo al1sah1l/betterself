@@ -106,6 +106,11 @@ Defined in [GoalPlanning](../design/concepts/GoalPlanning.md), line 1.
 - `reviseStrategy(goal: Goal, strategy: Strategy) : returns (goal: Goal)`
   - Refuses `GOAL_NOT_FOUND`: There is no such goal.
   - Refuses `STRATEGY_NOT_SET`: This goal does not have a strategy yet.
+- `acceptStrategyRevision(goal: Goal, strategy: Strategy, expectedRevision: String) : returns (goal: Goal)`
+  - Refuses `INVALID_STRATEGY`: Enter a valid strategy and revision identity.
+  - Refuses `GOAL_NOT_FOUND`: There is no such goal.
+  - Refuses `STRATEGY_NOT_SET`: This goal does not have a strategy yet.
+  - Refuses `STRATEGY_CHANGED`: The strategy changed. Generate a new review before applying it.
 - `updateGoal(goal: Goal, outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String) : returns (goal: Goal)`
   - Refuses `GOAL_NOT_FOUND`: There is no such goal.
 - `deleteGoal(goal: Goal) : returns (goal: Goal)`
@@ -163,6 +168,9 @@ Defined in [Reasoning](../design/concepts/Reasoning.md), line 1.
 
 - `proposeStrategy(outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String) : returns (strategy: Strategy)`
   - Refuses `INVALID_STRATEGY_PROPOSAL`: The reasoner did not produce a valid strategy.
+- `reviewProgress(context: ReviewInput) : returns (analysis: String, strategy: Strategy, revision: String)`
+  - Refuses `INVALID_REVIEW`: The review requires a saved strategy and a valid proposal.
+  - Refuses `REVIEW_UNAVAILABLE`: AI review is unavailable. Please try again.
 
 #### Instances
 
@@ -331,6 +339,33 @@ Former "the observed results of (goal)" — inputs (goal); bindings (result, des
       result
 ```
 
+### the strategy state of (goal)
+
+Authored path: `BetterSelf.strategyState.StrategyState`.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 5.
+
+```former
+Former "the strategy state of (goal)" — inputs (goal); bindings (strategy, revision); promises exactly one record — forms:
+  a record of
+    where GoalPlanning._strategySnapshot (goal) has (revision, strategy)
+    revision
+    strategy
+```
+
+### the review context of (goal)
+
+Authored path: `BetterSelf.progressReview.ReviewContext`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 7.
+
+```former
+Former "the review context of (goal)" — inputs (goal); bindings (); promises exactly one record — forms:
+  a record of
+    where GoalPlanning._goal (goal)
+    detail: former "the detail of (goal)" with (goal)
+    results: former "the observed results of (goal)" with (goal)
+    state: former "the strategy state of (goal)" with (goal)
+```
+
 ### the shared proofs in (group)
 
 Authored path: `BetterSelf.dashboard.GroupProofs`.
@@ -352,19 +387,6 @@ Former "the shared proofs in (group)" — inputs (group); bindings (proof, submi
           decision
           note
           reviewer
-```
-
-### the strategy state of (goal)
-
-Authored path: `BetterSelf.strategyState.StrategyState`.
-- Covered by [Strategy State](../design/compositions/strategy-state.md), line 5.
-
-```former
-Former "the strategy state of (goal)" — inputs (goal); bindings (strategy, revision); promises exactly one record — forms:
-  a record of
-    where GoalPlanning._strategySnapshot (goal) has (revision, strategy)
-    revision
-    strategy
 ```
 
 ## Reactions
@@ -1193,6 +1215,150 @@ then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
 ```
 
+### BetterSelf.progressReview.ApplyReviewStrategy
+
+Authored path: `BetterSelf.progressReview.ApplyReviewStrategy`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 15.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 23.
+
+```reaction
+when RequestBoundary.request (expectedRevision, goal, path: "/reviews/apply", requestId, session, strategy)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.progressReview.ApplyReviewStrategy:authorized#2
+
+Authored path: `BetterSelf.progressReview.ApplyReviewStrategy`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 15.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 23.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.progressReview.ApplyReviewStrategy
+where
+  earlier, RequestBoundary.request (expectedRevision, goal, path: "/reviews/apply", requestId, session, strategy)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  GoalPlanning.acceptStrategyRevision (expectedRevision, goal, strategy)
+```
+
+### BetterSelf.progressReview.ApplyReviewStrategy:authorized#3
+
+Authored path: `BetterSelf.progressReview.ApplyReviewStrategy`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 15.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 23.
+
+```reaction
+when GoalPlanning.acceptStrategyRevision (expectedRevision, goal, strategy), asked by BetterSelf.progressReview.ApplyReviewStrategy:authorized#2
+where
+  earlier, RequestBoundary.request (expectedRevision, goal, path: "/reviews/apply", requestId, session, strategy)
+then
+  RequestBoundary.respond (goal, requestId)
+```
+
+### BetterSelf.progressReview.ApplyReviewStrategy:forbidden#2
+
+Authored path: `BetterSelf.progressReview.ApplyReviewStrategy`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 15.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 23.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.progressReview.ApplyReviewStrategy
+where
+  earlier, RequestBoundary.request (expectedRevision, goal, path: "/reviews/apply", requestId, session, strategy)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.progressReview.ApplyReviewStrategy:missing#2
+
+Authored path: `BetterSelf.progressReview.ApplyReviewStrategy`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 15.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 23.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.progressReview.ApplyReviewStrategy
+where
+  earlier, RequestBoundary.request (expectedRevision, goal, path: "/reviews/apply", requestId, session, strategy)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
+### BetterSelf.progressReview.ReviewProgress
+
+Authored path: `BetterSelf.progressReview.ReviewProgress`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 3.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 22.
+
+```reaction
+when RequestBoundary.request (goal, path: "/reviews/propose", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.progressReview.ReviewProgress:authorized#2
+
+Authored path: `BetterSelf.progressReview.ReviewProgress`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 3.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 22.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.progressReview.ReviewProgress
+where
+  earlier, RequestBoundary.request (goal, path: "/reviews/propose", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  Reasoning.reviewProgress (context: goal)
+```
+
+### BetterSelf.progressReview.ReviewProgress:authorized#3
+
+Authored path: `BetterSelf.progressReview.ReviewProgress`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 3.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 22.
+
+```reaction
+when Reasoning.reviewProgress (context: goal, analysis, revision, strategy), asked by BetterSelf.progressReview.ReviewProgress:authorized#2
+where
+  earlier, RequestBoundary.request (goal, path: "/reviews/propose", requestId, session)
+then
+  RequestBoundary.respond (analysis, requestId, revision, strategy)
+```
+
+### BetterSelf.progressReview.ReviewProgress:forbidden#2
+
+Authored path: `BetterSelf.progressReview.ReviewProgress`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 3.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 22.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.progressReview.ReviewProgress
+where
+  earlier, RequestBoundary.request (goal, path: "/reviews/propose", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.progressReview.ReviewProgress:missing#2
+
+Authored path: `BetterSelf.progressReview.ReviewProgress`.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 3.
+- Covered by [Progress Review](../design/compositions/progress-review.md), line 22.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.progressReview.ReviewProgress
+where
+  earlier, RequestBoundary.request (goal, path: "/reviews/propose", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
 ### BetterSelf.proofSharing.ShareProofWithGroup
 
 Authored path: `BetterSelf.proofSharing.ShareProofWithGroup`.
@@ -1930,4 +2096,6 @@ not listed here have no explicit input contract.
 - `/proofs/submit` — requires `session`, `goal`, `commitment`, `occurrence`, `evidence`
 - `/results/record` — requires `session`, `goal`, `description`, `observedOn`
 - `/results/remove` — requires `session`, `goal`, `result`
+- `/reviews/apply` — requires `session`, `goal`, `strategy`, `expectedRevision`
+- `/reviews/propose` — requires `session`, `goal`
 - `/strategies/propose` — requires `session`, `goal`

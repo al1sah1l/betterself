@@ -4,6 +4,7 @@ import { ref } from "vue";
 import GoalDetailContent from "./GoalDetailContent.vue";
 import ObservedResults from "./ObservedResults.vue";
 import PlanControls from "./PlanControls.vue";
+import ProgressReview from "./ProgressReview.vue";
 
 defineProps<{
   session: string;
@@ -31,5 +32,12 @@ const revision = ref(0);
     :key="`results-${session}-${goal}`"
     :session="session"
     :goal="goal"
+  />
+
+  <ProgressReview
+    :key="`review-${session}-${goal}`"
+    :session="session"
+    :goal="goal"
+    @saved="revision += 1"
   />
 </template>

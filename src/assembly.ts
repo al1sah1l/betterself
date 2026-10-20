@@ -83,15 +83,36 @@ import {
   GetStrategyState,
 } from "./compositions/strategy-state.ts";
 
+import {
+  ReviewContext,
+  ReviewProgress,
+  ApplyReviewStrategy,
+} from "./compositions/progress-review.ts";
+
+import type {
+  ReviewContext as ReviewData,
+  ReviewContextProvider,
+} from "./concepts/Reasoning/review-types.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
+  let readReviewContext: ReviewContextProvider =
+    async () => {
+      throw new Error(
+        "Application is not assembled yet.",
+      );
+    };
+
   const instances =
     applicationConceptSet.implementations("mongo", {
       db,
+
+      reviewContextProvider: (reference: string) =>
+        readReviewContext(reference),
     });
 
-  return assemble({
+  const application = assemble({
     conceptSet: applicationConceptSet,
     instances,
 
@@ -158,6 +179,12 @@ export function assembleApplication() {
           GetStrategyState,
         },
 
+        progressReview: {
+          ReviewContext,
+          ReviewProgress,
+          ApplyReviewStrategy,
+        },
+
         dashboard: {
           ListMyGoals,
           MyGoals,
@@ -172,4 +199,43 @@ export function assembleApplication() {
       },
     },
   });
+
+  readReviewContext = async (reference) => {
+    const value = await application.form(
+      ReviewContext({
+        goal: reference,
+      }),
+    );
+
+    if (
+      typeof value !== "object" ||
+      value === null ||
+      !("detail" in value) ||
+      !("results" in value) ||
+      !("state" in value)
+    ) {
+      throw new Error(
+        "Invalid formed review context.",
+      );
+    }
+
+    const state = value.state;
+
+    if (
+      typeof state !== "object" ||
+      state === null ||
+      !("strategy" in state) ||
+      !Array.isArray(state.strategy) ||
+      !("revision" in state) ||
+      typeof state.revision !== "string"
+    ) {
+      throw new Error(
+        "Invalid strategy snapshot.",
+      );
+    }
+
+    return value as ReviewData;
+  };
+
+  return application;
 }

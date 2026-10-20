@@ -7,11 +7,7 @@ import { db } from "./db.ts";
 import { serveFrontend } from "./http/frontend.ts";
 
 const application = assembleApplication();
-
-const gateway = createGateway({
-  application,
-});
-
+const gateway = createGateway({ application });
 const invokeGateway = gateway.invoke.bind(gateway);
 
 gateway.invoke = async (path, input, options) => {
@@ -51,10 +47,7 @@ gateway.invoke = async (path, input, options) => {
 
   const result = await invokeGateway(
     path,
-    {
-      ...input,
-      occurrence,
-    },
+    { ...input, occurrence },
     options,
   );
 
@@ -83,6 +76,10 @@ const handler = createHttpHandler({
       FORBIDDEN: "FORBIDDEN",
       STRATEGY_ALREADY_SET: "CONFLICT",
       STRATEGY_NOT_SET: "CONFLICT",
+      STRATEGY_CHANGED: "CONFLICT",
+      INVALID_STRATEGY: "INVALID_REQUEST",
+
+      INVALID_REVIEW: "INVALID_REQUEST",
 
       COMMITMENT_NOT_FOUND: "NOT_FOUND",
       COMMITMENT_GOAL_MISMATCH: "INVALID_REQUEST",
@@ -127,9 +124,7 @@ const server = Bun.serve({
           { timeoutMS: 3000 },
         );
 
-        return Response.json({
-          status: "ok",
-        });
+        return Response.json({ status: "ok" });
       } catch {
         return Response.json(
           { status: "unavailable" },

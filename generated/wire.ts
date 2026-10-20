@@ -341,6 +341,30 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "RESULT_NOT_FOUND" | "UNKNOWN_SESSION" };
   };
+  "/reviews/apply": {
+    input: {
+      "expectedRevision": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["acceptStrategyRevision"]>[0], ["expectedRevision"]>>;
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["acceptStrategyRevision"]>[0], ["goal"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+      "strategy": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["acceptStrategyRevision"]>[0], ["strategy"]>>;
+    };
+    output: {
+      "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["acceptStrategyRevision"]>[0], ["goal"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "INVALID_STRATEGY" | "STRATEGY_CHANGED" | "STRATEGY_NOT_SET" | "UNKNOWN_SESSION" };
+  };
+  "/reviews/propose": {
+    input: {
+      "goal": Jsonify<OneOf<[AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Reasoning"]["reviewProgress"]>[0], ["context"]>, AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "analysis": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Reasoning"]["reviewProgress"]>>, ["analysis"]>>;
+      "revision": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Reasoning"]["reviewProgress"]>>, ["revision"]>>;
+      "strategy": Jsonify<AtPath<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["Reasoning"]["reviewProgress"]>>, ["strategy"]>>;
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "INVALID_REVIEW" | "REVIEW_UNAVAILABLE" | "UNKNOWN_SESSION" };
+  };
   "/strategies/propose": {
     input: {
       "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>>;

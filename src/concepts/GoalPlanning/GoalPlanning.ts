@@ -3,6 +3,8 @@ import type { Collection, Db } from "mongodb";
 export class GoalNotFound extends Error {}
 export class StrategyAlreadySet extends Error {}
 export class StrategyNotSet extends Error {}
+export class StrategyChanged extends Error {}
+export class InvalidStrategy extends Error {}
 
 export interface StrategyStep {
   description: string;
@@ -81,7 +83,7 @@ export class GoalPlanningConcept<User extends string> {
       },
     );
 
-    if (result.matchedCount === 0) {
+    if (!result.matchedCount) {
       const existing = await this.goals.findOne({
         _id: goal,
       });
@@ -118,7 +120,7 @@ export class GoalPlanningConcept<User extends string> {
       },
     );
 
-    if (result.matchedCount === 0) {
+    if (!result.matchedCount) {
       const existing = await this.goals.findOne({
         _id: goal,
       });
@@ -129,6 +131,92 @@ export class GoalPlanningConcept<User extends string> {
 
       throw new StrategyNotSet(
         "This goal does not have a strategy yet.",
+      );
+    }
+
+    return { goal };
+  }
+
+  async acceptStrategyRevision({
+    goal,
+    strategy,
+    expectedRevision,
+  }: {
+    goal: string;
+    strategy: Strategy;
+    expectedRevision: string;
+  }) {
+    if (
+      typeof expectedRevision !== "string" ||
+      !expectedRevision ||
+      !Array.isArray(strategy) ||
+      strategy.length === 0 ||
+      strategy.length > 20 ||
+      strategy.some(
+        (step) =>
+          !step ||
+          typeof step.description !== "string" ||
+          !step.description.trim() ||
+          typeof step.successCriterion !== "string" ||
+          !step.successCriterion.trim(),
+      )
+    ) {
+      throw new InvalidStrategy(
+        "Enter a valid strategy and revision identity.",
+      );
+    }
+
+    const matchRevision =
+      expectedRevision === "initial"
+        ? {
+            $or: [
+              { strategyRevision: "initial" },
+              {
+                strategyRevision: {
+                  $exists: false,
+                },
+              },
+            ],
+          }
+        : {
+            strategyRevision: expectedRevision,
+          };
+
+    const result = await this.goals.updateOne(
+      {
+        _id: goal,
+        currentStrategy: { $exists: true },
+        ...matchRevision,
+      },
+      {
+        $set: {
+          currentStrategy: strategy.map((step) => ({
+            description: step.description.trim(),
+            successCriterion:
+              step.successCriterion.trim(),
+          })),
+          strategyRevision: crypto.randomUUID(),
+        },
+      },
+    );
+
+    if (!result.matchedCount) {
+      const found = await this.goals.findOne({
+        _id: goal,
+      });
+
+      if (!found) {
+        throw new GoalNotFound("There is no such goal.");
+      }
+
+      if (found.currentStrategy === undefined) {
+        throw new StrategyNotSet(
+          "This goal does not have a strategy yet.",
+        );
+      }
+
+      throw new StrategyChanged(
+        "The strategy changed. Generate a new review before applying it.",
       );
     }
 
@@ -163,7 +251,7 @@ export class GoalPlanningConcept<User extends string> {
       },
     );
 
-    if (result.matchedCount === 0) {
+    if (!result.matchedCount) {
       throw new GoalNotFound("There is no such goal.");
     }
 
@@ -175,7 +263,7 @@ export class GoalPlanningConcept<User extends string> {
       _id: goal,
     });
 
-    if (result.deletedCount === 0) {
+    if (!result.deletedCount) {
       throw new GoalNotFound("There is no such goal.");
     }
 
@@ -189,12 +277,10 @@ export class GoalPlanningConcept<User extends string> {
 
     if (!found) return [];
 
-    return [
-      {
-        strategy: found.currentStrategy ?? [],
-        revision: found.strategyRevision ?? "initial",
-      },
-    ];
+    return [{
+      strategy: found.currentStrategy ?? [],
+      revision: found.strategyRevision ?? "initial",
+    }];
   }
 
   async _goal({ goal }: { goal: string }) {
@@ -204,19 +290,17 @@ export class GoalPlanningConcept<User extends string> {
 
     if (!found) return [];
 
-    return [
-      {
-        owner: found.owner,
-        outcome: found.outcome,
-        currentContext: found.currentContext,
-        constraints: found.constraints,
-        timeline: found.timeline,
-        successDefinition: found.successDefinition,
-        ...(found.currentStrategy !== undefined
-          ? { currentStrategy: found.currentStrategy }
-          : {}),
-      },
-    ];
+    return [{
+      owner: found.owner,
+      outcome: found.outcome,
+      currentContext: found.currentContext,
+      constraints: found.constraints,
+      timeline: found.timeline,
+      successDefinition: found.successDefinition,
+      ...(found.currentStrategy !== undefined
+        ? { currentStrategy: found.currentStrategy }
+        : {}),
+    }];
   }
 
   async _goalsByOwner({ owner }: { owner: User }) {
