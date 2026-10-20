@@ -62,6 +62,7 @@ type GoalData = {
 };
 
 const detail = ref<GoalData | null>(null);
+const strategyRevision = ref("initial");
 const loading = ref(false);
 const error = ref("");
 
@@ -87,8 +88,20 @@ async function openCommitment(
   commitmentDialog.value?.showModal();
 }
 
-function useStrategyStep(step: StrategyStep, index: number) {
-  void openCommitment(step.description, `step:${index}`);
+function sourceStepFor(index: number): string {
+  return strategyRevision.value === "initial"
+    ? `step:${index}`
+    : `strategy:${strategyRevision.value}:step:${index}`;
+}
+
+function useStrategyStep(
+  step: StrategyStep,
+  index: number,
+) {
+  void openCommitment(
+    step.description,
+    sourceStepFor(index),
+  );
 }
 
 function hasCommitmentForStep(index: number): boolean {
@@ -96,7 +109,7 @@ function hasCommitmentForStep(index: number): boolean {
     detail.value?.commitments.some(
       (commitment) =>
         commitment.active &&
-        commitment.sourceStep === `step:${index}`,
+        commitment.sourceStep === sourceStepFor(index),
     ) ?? false
   );
 }
@@ -132,7 +145,25 @@ async function loadDetail() {
       },
     );
 
-    detail.value = result.detail;
+    const snapshot = await api<{
+      state: {
+        strategy: StrategyStep[];
+        revision: string;
+      };
+    }>("/dashboard/strategy-state", {
+      session: props.session,
+      goal: props.goal,
+    });
+
+    strategyRevision.value =
+      snapshot.state.revision;
+
+    detail.value = {
+      ...result.detail,
+      currentStrategy: snapshot.state.strategy.length
+        ? snapshot.state.strategy
+        : null,
+    };
   } catch (cause) {
     if (cause instanceof ApiError) {
       error.value =
@@ -164,29 +195,39 @@ function proofStatus(proof: SubmittedProof) {
   );
 
   if (verified && disputed) {
-    return { label: "Mixed reviews", tone: "mixed" };
+    return {
+      label: "Mixed reviews",
+      tone: "mixed",
+    };
   }
 
   if (disputed) {
-    return { label: "Disputed", tone: "disputed" };
+    return {
+      label: "Disputed",
+      tone: "disputed",
+    };
   }
 
   if (verified) {
-    return { label: "Verified", tone: "verified" };
+    return {
+      label: "Verified",
+      tone: "verified",
+    };
   }
 
-  return { label: "Pending review", tone: "pending" };
+  return {
+    label: "Pending review",
+    tone: "pending",
+  };
 }
 
-async function deletePendingProof(proof: SubmittedProof) {
+async function deletePendingProof(
+  proof: SubmittedProof,
+) {
   if (deletingProof.value || loading.value) return;
   if (proof.verifications.length > 0) return;
 
-  const confirmed = window.confirm(
-    "Delete this proof?",
-  );
-
-  if (!confirmed) return;
+  if (!window.confirm("Delete this proof?")) return;
 
   deletingProof.value = proof.proof;
   deleteError.value = "";
@@ -213,7 +254,6 @@ async function deletePendingProof(proof: SubmittedProof) {
     }
 
     deleteSuccess.value = "Proof deleted.";
-
     await loadDetail();
   } catch (cause) {
     if (cause instanceof ApiError) {
@@ -277,7 +317,7 @@ onMounted(loadDetail);
       <ol v-if="detail.currentStrategy">
         <li
           v-for="(step, index) in detail.currentStrategy"
-          :key="index"
+          :key="`${strategyRevision}-${index}`"
         >
           <strong>{{ step.description }}</strong>
           <p class="muted">{{ step.successCriterion }}</p>
@@ -286,13 +326,14 @@ onMounted(loadDetail);
             v-if="!hasCommitmentForStep(index)"
             class="text-button"
             type="button"
+            :disabled="loading"
             @click="useStrategyStep(step, index)"
           >
             Create commitment from this step
           </button>
 
           <p v-else class="muted">
-            Commitment created for this step.
+            Active commitment created for this step.
           </p>
         </li>
       </ol>
@@ -335,6 +376,7 @@ onMounted(loadDetail);
       <button
         class="primary"
         type="button"
+        :disabled="loading"
         @click="openCommitment()"
       >
         + Add commitment
@@ -395,7 +437,10 @@ onMounted(loadDetail);
                       >
                         <strong>{{ review.reviewer }}</strong>
                         · {{ review.decision }}
-                        <p v-if="review.note">{{ review.note }}</p>
+
+                        <p v-if="review.note">
+                          {{ review.note }}
+                        </p>
                       </li>
                     </ul>
                   </div>
@@ -417,7 +462,9 @@ onMounted(loadDetail);
               </li>
             </ul>
 
-            <p v-else class="muted">No proofs submitted yet.</p>
+            <p v-else class="muted">
+              No proofs submitted yet.
+            </p>
           </div>
 
           <details
@@ -436,7 +483,8 @@ onMounted(loadDetail);
                   : undefined
               "
               :disabled="
-                !commitment.recurring && commitment.proofs.length > 0
+                !commitment.recurring &&
+                commitment.proofs.length > 0
               "
               @submitted="loadDetail"
             />
@@ -444,7 +492,9 @@ onMounted(loadDetail);
         </li>
       </ul>
 
-      <p v-else class="muted">No commitments yet.</p>
+      <p v-else class="muted">
+        No commitments yet.
+      </p>
     </template>
 
     <button
@@ -463,7 +513,9 @@ onMounted(loadDetail);
       @cancel="cancelCommitment"
     >
       <header class="dialog-header">
-        <h3 id="commitment-dialog-title">Create commitment</h3>
+        <h3 id="commitment-dialog-title">
+          Create commitment
+        </h3>
 
         <button
           class="text-button"

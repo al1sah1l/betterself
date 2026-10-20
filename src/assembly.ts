@@ -78,6 +78,11 @@ import {
   RetireCommitment,
 } from "./compositions/plan-management.ts";
 
+import {
+  StrategyState,
+  GetStrategyState,
+} from "./compositions/strategy-state.ts";
+
 import { db } from "./db.ts";
 
 export function assembleApplication() {
@@ -146,6 +151,11 @@ export function assembleApplication() {
         planManagement: {
           UpdateGoal,
           RetireCommitment,
+        },
+
+        strategyState: {
+          StrategyState,
+          GetStrategyState,
         },
 
         dashboard: {

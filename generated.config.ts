@@ -21,6 +21,7 @@ export default {
       new URL("./design/compositions/dashboard.md", import.meta.url),
       new URL("./design/compositions/results.md", import.meta.url),
       new URL("./design/compositions/plan-management.md", import.meta.url),
+      new URL("./design/compositions/strategy-state.md", import.meta.url),
     ],
   },
 };

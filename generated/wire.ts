@@ -194,6 +194,19 @@ export type ApplicationWire = {
     };
     error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
   };
+  "/dashboard/strategy-state": {
+    input: {
+      "goal": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_goal"]>[0], ["goal"]>>;
+      "session": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["Sessioning"]["current"]>[0], ["session"]>>;
+    };
+    output: {
+      "state": {
+        "revision": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_strategySnapshot"]>>>, ["revision"]>>;
+        "strategy": Jsonify<AtPath<QueryRow<Awaited<ReturnType<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["_strategySnapshot"]>>>, ["strategy"]>>;
+      };
+    };
+    error: { error: AppWideError | "FORBIDDEN" | "GOAL_NOT_FOUND" | "INVALID_INPUT" | "UNKNOWN_SESSION" };
+  };
   "/goals/create": {
     input: {
       "constraints": Jsonify<AtPath<Parameters<(typeof ApplicationConceptSet.concepts)["GoalPlanning"]["createGoal"]>[0], ["constraints"]>>;

@@ -29,6 +29,7 @@ a set of Goals with
   a timeline String
   a successDefinition String
   an optional currentStrategy Strategy
+  an optional strategyRevision String
   a createdAt DateTime
 ```
 
@@ -56,7 +57,7 @@ setStrategy(goal: Goal, strategy: Strategy) : returns (goal: Goal)
 reviseStrategy(goal: Goal, strategy: Strategy) : returns (goal: Goal)
   where goal is in Goals and goal has a currentStrategy
   then
-    replace the goal's currentStrategy with strategy
+    replace the goal's currentStrategy with strategy and assign a fresh strategyRevision identity
     returns goal
   where goal is not in Goals
   then
@@ -87,6 +88,9 @@ deleteGoal(goal: Goal) : returns (goal: Goal)
 ## Queries
 
 ```queries
+_strategySnapshot(goal: Goal) : optional (strategy: Strategy, revision: String)
+  Returns the current strategy and its revision identity from the same goal record, or no row for a missing goal. An absent strategy is an empty sequence. An absent revision is initial for compatibility with existing goals.
+
 _goal(goal: Goal) : optional (owner: User, outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String, currentStrategy?: Strategy)
   Returns the goal's current fields, or no row when the goal does not exist.
 

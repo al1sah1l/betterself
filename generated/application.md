@@ -113,6 +113,7 @@ Defined in [GoalPlanning](../design/concepts/GoalPlanning.md), line 1.
 
 #### Queries
 
+- `_strategySnapshot(goal: Goal) : optional (strategy: Strategy, revision: String)`
 - `_goal(goal: Goal) : optional (owner: User, outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String, currentStrategy?: Strategy)`
 - `_goalsByOwner(owner: User) : many (goal: Goal, outcome: String, currentContext: String, constraints: String, timeline: String, successDefinition: String, currentStrategy?: Strategy)`
 
@@ -351,6 +352,19 @@ Former "the shared proofs in (group)" — inputs (group); bindings (proof, submi
           decision
           note
           reviewer
+```
+
+### the strategy state of (goal)
+
+Authored path: `BetterSelf.strategyState.StrategyState`.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 5.
+
+```former
+Former "the strategy state of (goal)" — inputs (goal); bindings (strategy, revision); promises exactly one record — forms:
+  a record of
+    where GoalPlanning._strategySnapshot (goal) has (revision, strategy)
+    revision
+    strategy
 ```
 
 ## Reactions
@@ -1738,6 +1752,64 @@ then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
 ```
 
+### BetterSelf.strategyState.GetStrategyState
+
+Authored path: `BetterSelf.strategyState.GetStrategyState`.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 3.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 20.
+
+```reaction
+when RequestBoundary.request (goal, path: "/dashboard/strategy-state", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.strategyState.GetStrategyState:authorized#2
+
+Authored path: `BetterSelf.strategyState.GetStrategyState`.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 3.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.strategyState.GetStrategyState
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/strategy-state", requestId, session)
+  GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (requestId, state: former "the strategy state of (goal)" with (goal))
+```
+
+### BetterSelf.strategyState.GetStrategyState:forbidden#2
+
+Authored path: `BetterSelf.strategyState.GetStrategyState`.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 3.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.strategyState.GetStrategyState
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/strategy-state", requestId, session)
+  GoalPlanning._goal (goal)
+  no GoalPlanning._goal (goal) has (owner: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.strategyState.GetStrategyState:missing#2
+
+Authored path: `BetterSelf.strategyState.GetStrategyState`.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 3.
+- Covered by [Strategy State](../design/compositions/strategy-state.md), line 20.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.strategyState.GetStrategyState
+where
+  earlier, RequestBoundary.request (goal, path: "/dashboard/strategy-state", requestId, session)
+  no GoalPlanning._goal (goal)
+then
+  RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
+```
+
 ### BetterSelf.verification.ReviewProof
 
 Authored path: `BetterSelf.verification.ReviewProof`.
@@ -1846,6 +1918,7 @@ not listed here have no explicit input contract.
 - `/dashboard/group-proofs` — requires `session`, `group`
 - `/dashboard/groups` — requires `session`
 - `/dashboard/results` — requires `session`, `goal`
+- `/dashboard/strategy-state` — requires `session`, `goal`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/goals/update` — requires `session`, `goal`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
