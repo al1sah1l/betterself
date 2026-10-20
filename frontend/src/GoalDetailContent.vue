@@ -76,10 +76,7 @@ const commitmentFormKey = ref(0);
 const commitmentDialog = ref<HTMLDialogElement | null>(null);
 const commitmentSaving = ref(false);
 
-async function openCommitment(
-  description = "",
-  sourceStep = "",
-) {
+async function openCommitment(description = "", sourceStep = "") {
   commitmentDescription.value = description;
   commitmentSourceStep.value = sourceStep;
   commitmentFormKey.value += 1;
@@ -94,14 +91,8 @@ function sourceStepFor(index: number): string {
     : `strategy:${strategyRevision.value}:step:${index}`;
 }
 
-function useStrategyStep(
-  step: StrategyStep,
-  index: number,
-) {
-  void openCommitment(
-    step.description,
-    sourceStepFor(index),
-  );
+function useStrategyStep(step: StrategyStep, index: number) {
+  void openCommitment(step.description, sourceStepFor(index));
 }
 
 function hasCommitmentForStep(index: number): boolean {
@@ -120,9 +111,7 @@ function closeCommitment() {
 }
 
 function cancelCommitment(event: Event) {
-  if (commitmentSaving.value) {
-    event.preventDefault();
-  }
+  if (commitmentSaving.value) event.preventDefault();
 }
 
 async function commitmentCreated() {
@@ -155,8 +144,7 @@ async function loadDetail() {
       goal: props.goal,
     });
 
-    strategyRevision.value =
-      snapshot.state.revision;
+    strategyRevision.value = snapshot.state.revision;
 
     detail.value = {
       ...result.detail,
@@ -189,44 +177,26 @@ function proofStatus(proof: SubmittedProof) {
   const verified = proof.verifications.some(
     (review) => review.decision === "verified",
   );
-
   const disputed = proof.verifications.some(
     (review) => review.decision === "disputed",
   );
 
   if (verified && disputed) {
-    return {
-      label: "Mixed reviews",
-      tone: "mixed",
-    };
+    return { label: "Mixed reviews", tone: "mixed" };
   }
-
   if (disputed) {
-    return {
-      label: "Disputed",
-      tone: "disputed",
-    };
+    return { label: "Disputed", tone: "disputed" };
   }
-
   if (verified) {
-    return {
-      label: "Verified",
-      tone: "verified",
-    };
+    return { label: "Verified", tone: "verified" };
   }
 
-  return {
-    label: "Pending review",
-    tone: "pending",
-  };
+  return { label: "Pending review", tone: "pending" };
 }
 
-async function deletePendingProof(
-  proof: SubmittedProof,
-) {
+async function deletePendingProof(proof: SubmittedProof) {
   if (deletingProof.value || loading.value) return;
   if (proof.verifications.length > 0) return;
-
   if (!window.confirm("Delete this proof?")) return;
 
   deletingProof.value = proof.proof;
@@ -287,73 +257,90 @@ onMounted(loadDetail);
     aria-label="Goal detail"
     :aria-busy="loading"
   >
-    <p v-if="loading && !detail" role="status">
-      Loading goal...
-    </p>
-
-    <p v-if="error" class="error" role="alert">
-      {{ error }}
-    </p>
+    <p v-if="loading && !detail" role="status">Loading goal...</p>
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
 
     <template v-if="detail">
-      <h2>{{ detail.outcome }}</h2>
+      <header class="goal-heading">
+        <p class="eyebrow">Your goal</p>
+        <h2>{{ detail.outcome }}</h2>
+      </header>
 
-      <dl>
-        <dt>Starting point</dt>
-        <dd>{{ detail.currentContext }}</dd>
-
-        <dt>Constraints</dt>
-        <dd>{{ detail.constraints }}</dd>
-
-        <dt>Timeline</dt>
-        <dd>{{ detail.timeline }}</dd>
-
-        <dt>Success definition</dt>
-        <dd>{{ detail.successDefinition }}</dd>
+      <dl class="goal-context">
+        <div>
+          <dt>Starting point</dt>
+          <dd>{{ detail.currentContext }}</dd>
+        </div>
+        <div>
+          <dt>Constraints</dt>
+          <dd>{{ detail.constraints }}</dd>
+        </div>
+        <div>
+          <dt>Timeline</dt>
+          <dd>{{ detail.timeline }}</dd>
+        </div>
+        <div>
+          <dt>Success definition</dt>
+          <dd>{{ detail.successDefinition }}</dd>
+        </div>
       </dl>
 
-      <h3>Strategy</h3>
+      <section class="content-section" aria-label="Strategy">
+        <header class="section-heading">
+          <div>
+            <p class="eyebrow">The approach</p>
+            <h3>Strategy</h3>
+          </div>
+        </header>
 
-      <ol v-if="detail.currentStrategy">
-        <li
-          v-for="(step, index) in detail.currentStrategy"
-          :key="`${strategyRevision}-${index}`"
-        >
-          <strong>{{ step.description }}</strong>
-          <p class="muted">{{ step.successCriterion }}</p>
-
-          <button
-            v-if="!hasCommitmentForStep(index)"
-            class="text-button"
-            type="button"
-            :disabled="loading"
-            @click="useStrategyStep(step, index)"
+        <ol v-if="detail.currentStrategy" class="strategy-list">
+          <li
+            v-for="(step, index) in detail.currentStrategy"
+            :key="`${strategyRevision}-${index}`"
           >
-            Create commitment from this step
-          </button>
+            <span class="step-number" aria-hidden="true">
+              {{ index + 1 }}
+            </span>
 
-          <p v-else class="muted">
-            Active commitment created for this step.
-          </p>
-        </li>
-      </ol>
+            <div class="step-content">
+              <strong>{{ step.description }}</strong>
+              <p class="muted">{{ step.successCriterion }}</p>
 
-      <StrategyProposal
-        v-else
-        :session="props.session"
-        :goal="props.goal"
-        @saved="loadDetail"
-      />
+              <button
+                v-if="!hasCommitmentForStep(index)"
+                class="text-button"
+                type="button"
+                :disabled="loading"
+                @click="useStrategyStep(step, index)"
+              >
+                + Create commitment
+              </button>
+
+              <p v-else class="step-connected">
+                Active commitment created
+              </p>
+            </div>
+          </li>
+        </ol>
+
+        <StrategyProposal
+          v-else
+          :session="props.session"
+          :goal="props.goal"
+          @saved="loadDetail"
+        />
+      </section>
 
       <section
         v-if="detail.group"
+        class="accountability-panel"
         aria-label="Goal accountability group"
       >
         <h3>Accountability group</h3>
         <p class="muted">
-          Proof submissions for this goal are shared with this group.
+          New proof submissions for this goal are shared with your group.
         </p>
-        <p>Group ID: {{ detail.group }}</p>
+        <p class="group-id">Group ID: {{ detail.group }}</p>
       </section>
 
       <AttachGoal
@@ -363,142 +350,165 @@ onMounted(loadDetail);
         @attached="loadDetail"
       />
 
-      <h3>Commitments</h3>
-
-      <p v-if="deleteError" class="error" role="alert">
-        {{ deleteError }}
-      </p>
-
-      <p v-if="deleteSuccess" role="status">
-        {{ deleteSuccess }}
-      </p>
-
-      <button
-        class="primary"
-        type="button"
-        :disabled="loading"
-        @click="openCommitment()"
-      >
-        + Add commitment
-      </button>
-
-      <ul v-if="detail.commitments.length">
-        <li
-          v-for="commitment in detail.commitments"
-          :key="commitment.commitment"
-        >
-          <strong>{{ commitment.description }}</strong>
-
-          <p class="muted">
-            {{ commitment.schedule }}
-            · {{ commitment.recurring ? "Recurring" : "One-time" }}
-            · {{ commitment.active ? "Active" : "Retired" }}
-          </p>
-
+      <section class="content-section" aria-label="Commitments">
+        <header class="section-heading">
           <div>
-            <h4>Submitted proofs</h4>
-
-            <ul v-if="commitment.proofs.length">
-              <li
-                v-for="proof in commitment.proofs"
-                :key="proof.proof"
-              >
-                <p>
-                  Occurrence:
-                  {{ new Date(proof.occurrence).toLocaleString() }}
-                </p>
-
-                <ul>
-                  <li
-                    v-for="(item, index) in proof.evidence"
-                    :key="index"
-                  >
-                    {{ item }}
-                  </li>
-                </ul>
-
-                <details class="claim-review">
-                  <summary
-                    class="review-badge"
-                    :class="`review-badge--${proofStatus(proof).tone}`"
-                  >
-                    {{ proofStatus(proof).label }}
-                  </summary>
-
-                  <div class="review-info">
-                    <p v-if="proof.verifications.length === 0">
-                      No peer reviews yet.
-                    </p>
-
-                    <ul v-else>
-                      <li
-                        v-for="review in proof.verifications"
-                        :key="review.reviewer"
-                      >
-                        <strong>{{ review.reviewer }}</strong>
-                        · {{ review.decision }}
-
-                        <p v-if="review.note">
-                          {{ review.note }}
-                        </p>
-                      </li>
-                    </ul>
-                  </div>
-                </details>
-
-                <button
-                  v-if="proof.verifications.length === 0"
-                  class="text-button delete-proof-button"
-                  type="button"
-                  :disabled="Boolean(deletingProof) || loading"
-                  @click="deletePendingProof(proof)"
-                >
-                  {{
-                    deletingProof === proof.proof
-                      ? "Deleting..."
-                      : "Delete pending proof"
-                  }}
-                </button>
-              </li>
-            </ul>
-
-            <p v-else class="muted">
-              No proofs submitted yet.
-            </p>
+            <p class="eyebrow">Put it into practice</p>
+            <h3>Commitments</h3>
           </div>
 
-          <details
-            v-if="commitment.active"
-            class="proof-submission"
+          <button
+            class="primary"
+            type="button"
+            :disabled="loading"
+            @click="openCommitment()"
           >
-            <summary>Submit proof</summary>
+            + Add commitment
+          </button>
+        </header>
 
-            <SubmitProof
-              :session="props.session"
-              :goal="props.goal"
-              :commitment="commitment.commitment"
-              :existing-occurrence="
-                !commitment.recurring
-                  ? commitment.completions[0]?.occurrence
-                  : undefined
-              "
-              :disabled="
-                !commitment.recurring &&
-                commitment.proofs.length > 0
-              "
-              @submitted="loadDetail"
-            />
-          </details>
-        </li>
-      </ul>
+        <p v-if="deleteError" class="error" role="alert">
+          {{ deleteError }}
+        </p>
+        <p v-if="deleteSuccess" class="feedback" role="status">
+          {{ deleteSuccess }}
+        </p>
 
-      <p v-else class="muted">
-        No commitments yet.
-      </p>
+        <ul v-if="detail.commitments.length" class="commitment-list">
+          <li
+            v-for="commitment in detail.commitments"
+            :key="commitment.commitment"
+            class="commitment-card"
+            :class="{ 'commitment-card--retired': !commitment.active }"
+          >
+            <header class="commitment-header">
+              <h4>{{ commitment.description }}</h4>
+
+              <span
+                class="state-badge"
+                :class="{ 'state-badge--retired': !commitment.active }"
+              >
+                {{ commitment.active ? "Active" : "Retired" }}
+              </span>
+            </header>
+
+            <div class="commitment-meta">
+              <span>{{ commitment.recurring ? "Recurring" : "One-time" }}</span>
+              <span>{{ commitment.schedule }}</span>
+            </div>
+
+            <div class="proofs-section">
+              <h5>
+                Submitted proofs
+                <span class="proof-count">
+                  {{ commitment.proofs.length }}
+                </span>
+              </h5>
+
+              <ul v-if="commitment.proofs.length" class="proof-list">
+                <li
+                  v-for="proof in commitment.proofs"
+                  :key="proof.proof"
+                  class="proof-card"
+                >
+                  <p class="proof-date">
+                    Completed
+                    <time :datetime="proof.occurrence">
+                      {{ new Date(proof.occurrence).toLocaleString() }}
+                    </time>
+                  </p>
+
+                  <ul class="evidence-list">
+                    <li
+                      v-for="(item, index) in proof.evidence"
+                      :key="index"
+                    >
+                      {{ item }}
+                    </li>
+                  </ul>
+
+                  <details class="claim-review">
+                    <summary
+                      class="review-badge"
+                      :class="`review-badge--${proofStatus(proof).tone}`"
+                    >
+                      {{ proofStatus(proof).label }}
+                    </summary>
+
+                    <div class="review-info">
+                      <p v-if="proof.verifications.length === 0">
+                        No peer reviews yet.
+                      </p>
+
+                      <ul v-else class="review-list">
+                        <li
+                          v-for="review in proof.verifications"
+                          :key="review.reviewer"
+                        >
+                          <p>
+                            <strong>{{ review.reviewer }}</strong>
+                            · {{ review.decision }}
+                          </p>
+                          <p v-if="review.note">{{ review.note }}</p>
+                        </li>
+                      </ul>
+                    </div>
+                  </details>
+
+                  <button
+                    v-if="proof.verifications.length === 0"
+                    class="text-button delete-proof-button"
+                    type="button"
+                    :disabled="Boolean(deletingProof) || loading"
+                    @click="deletePendingProof(proof)"
+                  >
+                    {{
+                      deletingProof === proof.proof
+                        ? "Deleting..."
+                        : "Delete pending proof"
+                    }}
+                  </button>
+                </li>
+              </ul>
+
+              <p v-else class="empty-state">
+                No proofs yet. Submit evidence when you complete this commitment.
+              </p>
+            </div>
+
+            <details
+              v-if="commitment.active"
+              class="proof-submission"
+            >
+              <summary>Submit proof</summary>
+
+              <SubmitProof
+                :session="props.session"
+                :goal="props.goal"
+                :commitment="commitment.commitment"
+                :existing-occurrence="
+                  !commitment.recurring
+                    ? commitment.completions[0]?.occurrence
+                    : undefined
+                "
+                :disabled="
+                  !commitment.recurring &&
+                  commitment.proofs.length > 0
+                "
+                @submitted="loadDetail"
+              />
+            </details>
+          </li>
+        </ul>
+
+        <p v-else class="empty-state">
+          No commitments yet. Start with a strategy step or add your own.
+        </p>
+      </section>
     </template>
 
     <button
-      class="text-button"
+      class="text-button reload-button"
       type="button"
       :disabled="loading"
       @click="loadDetail"
@@ -513,10 +523,7 @@ onMounted(loadDetail);
       @cancel="cancelCommitment"
     >
       <header class="dialog-header">
-        <h3 id="commitment-dialog-title">
-          Create commitment
-        </h3>
-
+        <h3 id="commitment-dialog-title">Create commitment</h3>
         <button
           class="text-button"
           type="button"
@@ -543,25 +550,372 @@ onMounted(loadDetail);
 <style scoped>
 .goal-detail {
   margin-top: 24px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
   overflow-wrap: anywhere;
 }
 
+.goal-heading {
+  margin-bottom: 24px;
+}
+
+.goal-heading h2 {
+  margin: 6px 0 0;
+  font-size: clamp(24px, 4vw, 32px);
+  line-height: 1.25;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.goal-context {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin: 0;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--background);
+}
+
 dt {
-  margin-top: 16px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 dd {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   color: var(--muted);
+  line-height: 1.6;
   white-space: pre-wrap;
 }
 
-li {
-  margin-bottom: 16px;
+.content-section {
+  margin-top: 36px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.section-heading h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.strategy-list,
+.commitment-list,
+.proof-list,
+.review-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.strategy-list {
+  display: grid;
+  gap: 12px;
+}
+
+.strategy-list > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.step-number {
+  display: grid;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: #eee8fb;
+  color: #6041b1;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.step-content {
+  min-width: 0;
+  line-height: 1.5;
+}
+
+.step-content .muted {
+  margin: 8px 0;
+}
+
+.step-content .text-button {
+  margin-top: 4px;
+}
+
+.step-connected {
+  margin: 12px 0 0;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.accountability-panel {
+  margin-top: 28px;
+  padding: 20px 24px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 12px 12px 0;
+  background: var(--background);
+}
+
+.accountability-panel h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.accountability-panel .muted {
+  margin: 8px 0;
+}
+
+.group-id {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.commitment-list {
+  display: grid;
+  gap: 20px;
+}
+
+.commitment-card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgb(41 36 59 / 4%);
+}
+
+.commitment-card--retired {
+  border-style: dashed;
+}
+
+.commitment-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.commitment-header h4 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+.state-badge {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eee8fb;
+  color: #6041b1;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.state-badge--retired {
+  background: #eeedf1;
+  color: #5d5869;
+}
+
+.commitment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.proofs-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.proofs-section h5 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+
+.proof-count {
+  min-width: 24px;
+  padding: 3px 7px;
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+}
+
+.proof-list {
+  display: grid;
+  gap: 12px;
+}
+
+.proof-card {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--background);
+}
+
+.proof-date {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.evidence-list {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.evidence-list li + li {
+  margin-top: 8px;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.claim-review {
+  margin-top: 16px;
+}
+
+.review-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+
+.review-badge::-webkit-details-marker {
+  display: none;
+}
+
+.review-badge::after {
+  content: "+";
+}
+
+.claim-review[open] > .review-badge::after {
+  content: "−";
+}
+
+.review-badge--pending {
+  background: #e7e5ec;
+  color: #514b60;
+}
+
+.review-badge--verified {
+  background: #e9dffb;
+  color: #58349f;
+}
+
+.review-badge--disputed {
+  background: #fce4e7;
+  color: #972438;
+}
+
+.review-badge--mixed {
+  background: #fff0cc;
+  color: #77500b;
+}
+
+.review-info {
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.review-info p {
+  margin: 0;
+}
+
+.review-info p + p {
+  margin-top: 6px;
+}
+
+.review-list li + li {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.delete-proof-button {
+  margin-top: 12px;
+  color: #a32939;
+  font-size: 12px;
+}
+
+.proof-submission {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.proof-submission > summary {
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.review-badge:focus-visible,
+.proof-submission > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.feedback {
+  color: var(--accent);
+  font-size: 14px;
+}
+
+.reload-button {
+  margin-top: 24px;
 }
 
 .commitment-dialog {
@@ -582,8 +936,8 @@ li {
 
 .dialog-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   gap: 16px;
 }
 
@@ -592,91 +946,38 @@ li {
   margin: 0;
 }
 
-.claim-review {
-  margin-top: 8px;
-}
+@media (max-width: 600px) {
+  .goal-context {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 20px;
+  }
 
-.review-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 13px;
-  font-weight: 650;
-  cursor: pointer;
-  list-style: none;
-}
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 
-.review-badge::-webkit-details-marker {
-  display: none;
-}
+  .commitment-card {
+    padding: 18px;
+  }
 
-.review-badge::after {
-  content: "+";
-}
+  .commitment-header {
+    flex-direction: column;
+    gap: 10px;
+  }
 
-.claim-review[open] > .review-badge::after {
-  content: "−";
-}
+  .proof-card {
+    padding: 14px;
+  }
 
-.review-badge:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
+  .strategy-list > li {
+    gap: 12px;
+    padding: 16px;
+  }
 
-.review-badge--pending {
-  background: #eeedf1;
-  color: #5d5869;
-}
-
-.review-badge--verified {
-  background: #eee8fb;
-  color: #6041b1;
-}
-
-.review-badge--disputed {
-  background: #fff0f0;
-  color: #a32939;
-}
-
-.review-badge--mixed {
-  background: #fff3d6;
-  color: #805b13;
-}
-
-.review-info {
-  margin-top: 10px;
-  padding: 12px 16px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
-
-.review-info p {
-  margin: 6px 0;
-}
-
-.delete-proof-button {
-  color: #a32939;
-}
-
-.proof-submission {
-  margin-top: 16px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-}
-
-.proof-submission > summary {
-  color: var(--accent);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.proof-submission > summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 4px;
+  .commitment-dialog {
+    padding: 20px;
+  }
 }
 </style>
