@@ -1,0 +1,261 @@
+bun test v1.4.2 (744846f84)
+
+tests/compositions/strategy-proposal.test.ts:
+(pass) owner can request a strategy proposal [47.07ms]
+(pass) another user cannot request a strategy for someone else's goal [11.26ms]
+(pass) missing goal returns GOAL_NOT_FOUND [4.45ms]
+(pass) invalid session cannot request a strategy proposal [9.98ms]
+
+tests/compositions/verification.test.ts:
+(pass) authenticated group member can review proof [78.44ms]
+(pass) authenticated non-member cannot review proof [64.47ms]
+(pass) client cannot spoof reviewer identity [54.89ms]
+(pass) invalid session cannot create a verification [56.11ms]
+(pass) missing proof does not create a verification [4.33ms]
+
+tests/compositions/proof-sharing.test.ts:
+(pass) proof is automatically shared when goal is attached to a group [57.90ms]
+(pass) proof is not shared when goal is not attached to a group [52.58ms]
+(pass) duplicate proof submission does not create another shared proof [61.15ms]
+(pass) deleting pending proof removes group reference and preserves completion claim [77.55ms]
+(pass) attaching a goal shares its existing proofs and excludes other goals [77.67ms]
+
+tests/compositions/commitments.test.ts:
+(pass) goal owner can create a recurring commitment [25.72ms]
+(pass) client cannot spoof ownership when creating a commitment [22.13ms]
+(pass) user cannot create commitment for another user's goal [9.86ms]
+(pass) creating commitment for missing goal returns GOAL_NOT_FOUND [3.32ms]
+(pass) invalid session does not create a commitment [7.64ms]
+
+tests/compositions/goals.test.ts:
+(pass) authenticated user becomes the goal owner [8.81ms]
+(pass) client cannot spoof goal owner [8.91ms]
+(pass) invalid session does not create a goal [2.65ms]
+(pass) goal owner can set the initial strategy [10.55ms]
+(pass) user cannot set strategy for another user's goal [10.39ms]
+(pass) setting strategy for missing goal returns GOAL_NOT_FOUND [2.31ms]
+(pass) setting strategy twice does not overwrite the original strategy [10.64ms]
+
+tests/compositions/completion.test.ts:
+(pass) submitting proof automatically records completion [45.80ms]
+(pass) multiple evidence items still create exactly one completion [41.65ms]
+(pass) proofs for different recurring occurrences create separate completions [44.70ms]
+(pass) rejected proof submission does not record completion [13.59ms]
+(pass) duplicate proof submission does not create a second completion [43.38ms]
+
+tests/compositions/group-management.test.ts:
+(pass) authenticated search returns public groups without exposing private groups [30.00ms]
+(pass) a member can read settings but a nonmember cannot spoof membership [29.92ms]
+(pass) owner can update settings and another user cannot spoof ownership [28.74ms]
+(pass) only the owner can delete a group through the endpoint [32.07ms]
+(pass) missing group settings return GROUP_NOT_FOUND [3.34ms]
+(pass) group creation accepts visibility and defaults to private [26.20ms]
+(pass) invalid sessions cannot search, read settings, update, or delete groups [25.98ms]
+
+tests/compositions/proof-resubmission.test.ts:
+(pass) resubmission preserves context, shares the attempt, and keeps one completion [86.25ms]
+(pass) another user cannot resubmit someone else's proof [73.34ms]
+(pass) retired commitments cannot receive resubmissions [72.20ms]
+(pass) invalid session cannot create a new attempt [76.17ms]
+(pass) missing proof returns PROOF_NOT_FOUND [73.94ms]
+
+tests/compositions/progress-review.test.ts:
+(pass) review is advisory and edited acceptance creates a fresh revision [30.84ms]
+(pass) two concurrent acceptances cannot both overwrite the same revision [15.87ms]
+(pass) foreign or invalid sessions cannot review or apply [14.62ms]
+(pass) invalid strategy and missing goals are refused [14.85ms]
+
+tests/compositions/plan-management.test.ts:
+(pass) owner updates context without replacing strategy or owner [21.62ms]
+(pass) retirement preserves execution and proof history and refuses repetition [156.75ms]
+(pass) another user and invalid sessions cannot change the plan [29.51ms]
+(pass) missing records and a mismatched goal are refused without retiring commitment [24.09ms]
+
+tests/compositions/dashboard.test.ts:
+(pass) authenticated user sees only their own goals and goal context [12.12ms]
+(pass) user with no goals receives an empty list [8.83ms]
+(pass) client-supplied user cannot change whose goals are returned [8.30ms]
+(pass) invalid session cannot list goals [7.35ms]
+(pass) owner can open a goal without strategy or commitments [8.93ms]
+(pass) another user cannot open someone else's goal [7.57ms]
+(pass) opening a missing goal returns GOAL_NOT_FOUND [2.76ms]
+(pass) invalid session cannot open goal detail [7.94ms]
+(pass) goal detail includes saved strategy, attached group, completion claims, and only this goal's commitments [52.23ms]
+(pass) my groups includes owned and joined groups but excludes other groups [30.73ms]
+(pass) user with no memberships receives an empty group list [75.81ms]
+(pass) invalid session cannot list groups [47.78ms]
+(pass) joined member can read an empty group proof list [29.52ms]
+(pass) nonmember cannot read group proofs even with a supplied member identity [26.59ms]
+(pass) missing group returns GROUP_NOT_FOUND [3.73ms]
+(pass) invalid session cannot read group proofs [23.09ms]
+(pass) group proofs includes evidence and updates after peer review [82.02ms]
+(pass) goal owner sees proof and peer review without a completion claim [48.10ms]
+
+tests/compositions/social-flow.test.ts:
+(pass) full accountability flow shares and verifies proof [86.59ms]
+
+tests/compositions/proofs.test.ts:
+(pass) goal owner can submit proof for their commitment [54.89ms]
+(pass) client cannot spoof proof submitter [54.83ms]
+(pass) successful proof submission automatically records completion [52.17ms]
+(pass) user cannot submit proof for another user's goal [21.06ms]
+(pass) missing commitment returns COMMITMENT_NOT_FOUND [8.10ms]
+(pass) commitment from another goal returns COMMITMENT_GOAL_MISMATCH [24.81ms]
+(pass) invalid session does not create proof or completion [20.53ms]
+(pass) one-time commitment rejects another proof after completion [55.43ms]
+(pass) another user cannot delete pending proof [55.25ms]
+(pass) proof with any peer review cannot be deleted [62.73ms]
+(pass) deleting missing proof returns an error [27.20ms]
+(pass) concurrent review and deletion preserve consistent proof state [69.40ms]
+(pass) owner can delete pending proof through the endpoint [83.19ms]
+(pass) client cannot spoof the submitter when deleting proof [54.38ms]
+(pass) invalid session cannot delete proof [52.56ms]
+(pass) deleted proof can be replaced for the same one-time completion claim [85.89ms]
+(pass) retired commitment refuses proof without storing proof or completion [29.20ms]
+(pass) concurrent proofs for different occurrences of a one-time commitment store only one proof and completion [77.94ms]
+
+tests/compositions/results.test.ts:
+(pass) owner records, reads, and removes a result [19.75ms]
+(pass) another user cannot record, read, or remove observations [18.92ms]
+(pass) missing goal is refused on every endpoint [8.63ms]
+(pass) invalid session cannot read or change observations [9.74ms]
+
+tests/compositions/strategy-state.test.ts:
+(pass) initial strategy and revisions have stable and distinct identities [27.47ms]
+(pass) strategy state requires owner session and handles missing goals [14.76ms]
+
+tests/compositions/authentication.test.ts:
+(pass) register creates an authenticated session [9.33ms]
+(pass) registered account persists across application instances [9.64ms]
+(pass) sign in returns a new valid session [8.71ms]
+(pass) sign out ends the session [7.38ms]
+
+tests/http/frontend.test.ts:
+(pass) serves the built homepage and hashed assets [9.92ms]
+(pass) does not expose missing assets or files outside the build directory [0.11ms]
+(pass) HEAD has no body and POST is refused [0.37ms]
+
+tests/concepts/ReviewReasoning.test.ts:
+(pass) review receives outcomes and execution context and preserves base revision [0.07ms]
+(pass) invalid review, missing strategy, and unavailable generator are refused [0.18ms]
+
+tests/concepts/ProofVerifying.test.ts:
+(pass) a proof can be submitted and retrieved [33.39ms]
+(pass) a proof can contain multiple pieces of evidence [29.22ms]
+(pass) a proof requires at least one piece of evidence [1.82ms]
+(pass) a missing proof returns no row [2.31ms]
+(pass) a proof can be found by commitment and occurrence [29.15ms]
+(pass) an occurrence without proof returns no row [2.65ms]
+(pass) proof cannot be submitted twice for the same commitment occurrence [34.74ms]
+(pass) only one simultaneous proof submission succeeds for the same occurrence [28.09ms]
+(pass) different occurrences of the same commitment can have different proofs [42.20ms]
+(pass) different commitments can have proof for the same occurrence [32.82ms]
+(pass) another user can verify a proof [32.83ms]
+(pass) a reviewer can dispute a proof [34.09ms]
+(pass) a user cannot review their own proof [31.81ms]
+(pass) a missing proof cannot be reviewed [30.16ms]
+(pass) the same reviewer cannot review the same proof twice [85.37ms]
+(pass) only one simultaneous review from the same reviewer succeeds [112.25ms]
+(pass) different reviewers can review the same proof [90.40ms]
+(pass) verifications are returned only for the requested proof [52.84ms]
+(pass) a proof with no reviews gets an empty verification list [27.60ms]
+(pass) verifications are returned in creation order [35.40ms]
+
+tests/concepts/AccountabilityGrouping.test.ts:
+(pass) a group can be created and the owner becomes a member [22.94ms]
+(pass) a missing group returns no row [2.04ms]
+(pass) a user can join an existing group [23.76ms]
+(pass) a user cannot join a missing group [22.13ms]
+(pass) a user cannot join the same group twice [25.77ms]
+(pass) only one simultaneous duplicate membership succeeds [29.41ms]
+(pass) a group member can attach a goal [29.52ms]
+(pass) a goal cannot be attached to a missing group [23.14ms]
+(pass) a non-member cannot attach a goal [29.36ms]
+(pass) a goal can belong to at most one accountability group [32.71ms]
+(pass) only one simultaneous attachment of the same goal succeeds [34.93ms]
+(pass) an unattached goal returns no group [2.83ms]
+(pass) proof can be shared with the group attached to its goal [26.37ms]
+(pass) proof cannot be shared for an unattached goal [31.25ms]
+(pass) the same proof cannot be shared twice with a group [26.35ms]
+(pass) only one simultaneous duplicate proof share succeeds [36.16ms]
+(pass) shared proofs are returned only for the requested group in sharing order [37.29ms]
+(pass) a group with no shared proofs gets an empty list [26.15ms]
+(pass) checkMember returns the group for a member of the attached goal [26.15ms]
+(pass) checkMember refuses when the goal is not attached [2.60ms]
+(pass) checkMember refuses when the user is not a member [87.45ms]
+(pass) groups for a user are filtered and returned in membership order [33.95ms]
+(pass) a user with no groups gets an empty list [1.95ms]
+(pass) members are returned in membership creation order [43.29ms]
+(pass) a missing group has no members [1.88ms]
+(pass) a missing group has no shared proofs [1.06ms]
+(pass) new groups are private by default and expose their owner [25.75ms]
+(pass) public search matches names and topics and excludes private groups [29.93ms]
+(pass) owner can rename a group and change its visibility [46.78ms]
+(pass) a member cannot update or delete another user's group [43.53ms]
+(pass) invalid group details do not create or change a group [45.06ms]
+(pass) owner deletion removes group relationships and allows goal reattachment [47.47ms]
+(pass) missing groups cannot be updated [2.29ms]
+(pass) private groups can be joined using a shared group ID [48.22ms]
+(pass) concurrent joining and deletion leave no membership behind [50.87ms]
+
+tests/concepts/ProofResubmission.test.ts:
+(pass) resubmission preserves the previous proof and its reviews [55.44ms]
+(pass) pending, verified, and mixed proofs cannot be resubmitted [54.34ms]
+(pass) resubmission checks author, existence, and evidence without adding attempts [59.05ms]
+(pass) only one concurrent resubmission succeeds [50.47ms]
+(pass) superseded proofs cannot receive new reviews [58.86ms]
+(pass) deleting a pending attempt restores its disputed predecessor [60.69ms]
+
+tests/concepts/GoalPlanning.test.ts:
+(pass) a user can create and retrieve a goal [16.37ms]
+(pass) a user can set a strategy for a goal [7.99ms]
+(pass) a user can revise an existing strategy [8.22ms]
+(pass) a strategy cannot be set twice [7.25ms]
+(pass) a strategy cannot be revised before it is set [8.02ms]
+(pass) a user can update a goal [6.67ms]
+(pass) a user can delete a goal [6.52ms]
+(pass) a user can retrieve only their own goals [7.00ms]
+(pass) actions refuse when the goal does not exist [3.58ms]
+(pass) goals are returned in creation order [8.41ms]
+(pass) updating a goal preserves its existing strategy [7.28ms]
+(pass) a user with no goals gets an empty list [1.43ms]
+
+tests/concepts/Reasoning.test.ts:
+(pass) Reasoning > proposes a strategy using the supplied goal context [0.11ms]
+(pass) Reasoning > rejects an empty strategy proposal [0.07ms]
+(pass) Reasoning > rejects a strategy step with an empty description [0.07ms]
+(pass) Reasoning > rejects a strategy step with an empty success criterion [0.04ms]
+
+tests/concepts/CommitmentTracking.test.ts:
+(pass) a commitment can be created and retrieved [13.88ms]
+(pass) an active commitment can be claimed complete [14.88ms]
+(pass) the same occurrence cannot be claimed complete twice [14.82ms]
+(pass) a recurring commitment can have multiple completed occurrences [17.38ms]
+(pass) an active commitment can be retired [14.84ms]
+(pass) a retired commitment cannot be claimed complete [16.31ms]
+(pass) a commitment cannot be retired twice [15.46ms]
+(pass) actions refuse when the commitment does not exist [9.09ms]
+(pass) retiring a commitment preserves its previous completions [15.37ms]
+(pass) commitments are returned by goal in creation order [14.81ms]
+(pass) a goal with no commitments gets an empty list [1.73ms]
+(pass) completions are returned for the correct commitment in occurrence order [16.60ms]
+(pass) a missing commitment returns no row [1.99ms]
+(pass) only one simultaneous completion claim succeeds for the same occurrence [18.24ms]
+(pass) a commitment with no completions gets an empty list [16.18ms]
+(pass) a one-time commitment cannot be completed more than once [17.00ms]
+(pass) only one simultaneous completion succeeds for a one-time commitment [14.32ms]
+(pass) checkProofSubmission allows recurring commitments without changing completions [15.47ms]
+(pass) checkProofSubmission allows a new one-time commitment [16.53ms]
+(pass) checkProofSubmission allows the same one-time occurrence but rejects another [19.23ms]
+(pass) checkProofSubmission rejects retired commitments [14.91ms]
+(pass) checkProofSubmission rejects nonexistent commitments [7.59ms]
+
+tests/concepts/ResultTracking.test.ts:
+(pass) record, read by date, isolate goals, and remove an observation [8.92ms]
+(pass) invalid input does not add results [1.43ms]
+(pass) wrong goal or missing identity cannot remove a result [6.16ms]
+
+ 205 pass
+ 0 fail
+ 518 expect() calls
+Ran 205 tests across 25 files. [6.78s]

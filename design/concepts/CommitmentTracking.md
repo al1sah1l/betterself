@@ -6,7 +6,7 @@ Keep track of concrete actions a user commits to for a goal, while keeping plann
 
 ## Principle
 
-A commitment belongs to a goal and may represent either a one-time or recurring action. A user can claim a scheduled occurrence as completed while the commitment is active. A commitment can later be retired without deleting its earlier completion history.
+A commitment belongs to a goal and may represent either a one-time or recurring action. A user can claim a scheduled occurrence as completed while the commitment is active. A commitment can later be retired without deleting its earlier completion history. Before proof submission, the application can check the commitment's availability and recurrence. A one-time commitment with a completion claim permits evidence for that same occurrence, but not for a different occurrence. This check does not create a completion claim or reserve a proof submission.
 
 ## Types
 
@@ -31,6 +31,8 @@ a set of Completions with
   a commitment Commitment
   an occurrence DateTime
   unique commitment and occurrence
+
+Rule: A one-time commitment has at most one Completion, regardless of occurrence.
 ```
 
 ## Actions
@@ -42,30 +44,48 @@ createCommitment(goal: Goal, description: String, recurring: Flag, schedule: Str
     add a new Commitment with goal, description, recurring, schedule, active true, and the current creation time
     store sourceStep when supplied and non-empty as an opaque reference identifying the source planning step
     returns commitment
-    
+
+checkProofSubmission(commitment: Commitment, occurrence: DateTime) : returns (commitment: Commitment, recurring: Flag)
+  where commitment is in Commitments and commitment is active and commitment is recurring
+  then
+    leave state unchanged
+    returns commitment, recurring
+  where commitment is in Commitments and commitment is active and commitment is not recurring and no Completion has this commitment
+  then
+    leave state unchanged
+    returns commitment, recurring
+  where commitment is in Commitments and commitment is active and commitment is not recurring and a Completion has this commitment and occurrence
+  then
+    leave state unchanged
+    returns commitment, recurring
+  where commitment is not in Commitments
+  then
+    refuses COMMITMENT_NOT_FOUND "There is no such commitment."
+  where commitment is in Commitments and commitment is not active
+  then
+    refuses COMMITMENT_RETIRED "This commitment is no longer active."
+  where commitment is in Commitments and commitment is active and commitment is not recurring and a Completion has this commitment with a different occurrence
+  then
+    refuses ONE_TIME_ALREADY_COMPLETED "This one-time commitment has already been completed."
+
 claimComplete(commitment: Commitment, occurrence: DateTime) : returns (completion: Completion)
   where commitment is in Commitments and commitment is active and commitment is recurring and no Completion has this commitment and occurrence
   then
     add a new Completion with commitment and occurrence
     returns completion
-
   where commitment is in Commitments and commitment is active and commitment is not recurring and no Completion has this commitment
   then
     add a new Completion with commitment and occurrence
     returns completion
-
   where commitment is not in Commitments
   then
     refuses COMMITMENT_NOT_FOUND "There is no such commitment."
-
   where commitment is in Commitments and commitment is not active
   then
     refuses COMMITMENT_RETIRED "This commitment is no longer active."
-
   where commitment is in Commitments and commitment is active and commitment is recurring and a Completion already has this commitment and occurrence
   then
     refuses COMPLETION_ALREADY_CLAIMED "This occurrence has already been completed."
-
   where commitment is in Commitments and commitment is active and commitment is not recurring and a Completion already has this commitment
   then
     refuses ONE_TIME_ALREADY_COMPLETED "This one-time commitment has already been completed."
@@ -93,5 +113,5 @@ _commitmentsByGoal(goal: Goal) : many (commitment: Commitment, description: Stri
   Returns all commitments for this goal in creation order, or no rows when the goal has no commitments.
 
 _completionsByCommitment(commitment: Commitment) : many (completion: Completion, occurrence: DateTime)
-  Returns all completion claims for this commitment ordered by occurrence time, or no rows when the commitment has no completions.
+  Returns completion claims for this commitment in occurrence order, or no rows when no completion has been claimed.
 ```

@@ -1,5 +1,6 @@
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 import { applicationConceptSet } from "./concepts.ts";
+import * as groupManagement from "./compositions/group-management.ts";
 
 import {
   Register,
@@ -34,6 +35,7 @@ import {
 
 import {
   ShareProofWithGroup,
+  ShareExistingProofsOnAttach,
   UnshareDeletedProof,
 } from "./compositions/proof-sharing.ts";
 
@@ -95,6 +97,7 @@ import type {
 } from "./concepts/Reasoning/review-types.ts";
 
 import { db } from "./db.ts";
+import * as proofResubmission from "./compositions/proof-resubmission.ts";
 
 export function assembleApplication() {
   let readReviewContext: ReviewContextProvider =
@@ -145,8 +148,12 @@ export function assembleApplication() {
 
         proofSharing: {
           ShareProofWithGroup,
+          ShareExistingProofsOnAttach,
           UnshareDeletedProof,
         },
+
+        groupManagement,
+        proofResubmission,
 
         verification: {
           ReviewProof,

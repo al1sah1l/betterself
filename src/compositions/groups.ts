@@ -19,17 +19,13 @@ const {
 
 export const CreateGroup = endpoint(
   "/groups/create",
-  ({
-    session,
-    owner,
-    name,
-    topic,
-    group,
-  }) =>
+
+  ({ session, owner, name, topic, visibility, group }) =>
     receive({
       session,
       name,
       topic,
+      visibility,
     })
       .then(
         Sessioning.current({
@@ -43,6 +39,7 @@ export const CreateGroup = endpoint(
           owner,
           name,
           topic,
+          visibility,
         }).responds({
           group,
         }),
@@ -52,13 +49,13 @@ export const CreateGroup = endpoint(
           group,
         }),
       ),
+
   {
     input: {
-      required: [
-        "session",
-        "name",
-        "topic",
-      ],
+      required: ["session", "name", "topic"],
+      defaults: {
+        visibility: "private",
+      },
     },
   },
 );

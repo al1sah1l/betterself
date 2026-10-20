@@ -14,7 +14,15 @@ Defined in [AccountabilityGrouping](../design/concepts/AccountabilityGrouping.md
 
 #### Actions
 
-- `createGroup(owner: User, name: String, topic: String) : returns (group: Group)`
+- `createGroup(owner: User, name: String, topic: String, visibility?: String) : returns (group: Group)`
+  - Refuses `INVALID_GROUP_DETAILS`: Enter a name of 1–100 characters, a topic of 1–500 characters, and public or private visibility.
+- `updateGroup(group: Group, owner: User, name: String, topic: String, visibility: String) : returns (group: Group)`
+  - Refuses `GROUP_NOT_FOUND`: There is no such group.
+  - Refuses `NOT_GROUP_OWNER`: Only the group owner can change or delete this group.
+  - Refuses `INVALID_GROUP_DETAILS`: Enter a name of 1–100 characters, a topic of 1–500 characters, and public or private visibility.
+- `deleteGroup(group: Group, owner: User) : returns (group: Group)`
+  - Refuses `GROUP_NOT_FOUND`: There is no such group.
+  - Refuses `NOT_GROUP_OWNER`: Only the group owner can change or delete this group.
 - `joinGroup(group: Group, user: User) : returns (group: Group)`
   - Refuses `GROUP_NOT_FOUND`: There is no such group.
   - Refuses `ALREADY_MEMBER`: This user is already a member of this group.
@@ -33,6 +41,8 @@ Defined in [AccountabilityGrouping](../design/concepts/AccountabilityGrouping.md
 #### Queries
 
 - `_group(group: Group) : optional (name: String, topic: String)`
+- `_groupSettings(group: Group) : optional (owner: User, name: String, topic: String, visibility: String)`
+- `_publicGroups(search: String) : many (group: Group, name: String, topic: String)`
 - `_groupsForUser(user: User) : many (group: Group, name: String, topic: String)`
 - `_members(group: Group) : many (user: User)`
 - `_groupForGoal(goal: Goal) : optional (group: Group)`
@@ -73,6 +83,10 @@ Defined in [CommitmentTracking](../design/concepts/CommitmentTracking.md), line 
 #### Actions
 
 - `createCommitment(goal: Goal, description: String, recurring: Flag, schedule: String, sourceStep?: String) : returns (commitment: Commitment)`
+- `checkProofSubmission(commitment: Commitment, occurrence: DateTime) : returns (commitment: Commitment, recurring: Flag)`
+  - Refuses `COMMITMENT_NOT_FOUND`: There is no such commitment.
+  - Refuses `COMMITMENT_RETIRED`: This commitment is no longer active.
+  - Refuses `ONE_TIME_ALREADY_COMPLETED`: This one-time commitment has already been completed.
 - `claimComplete(commitment: Commitment, occurrence: DateTime) : returns (completion: Completion)`
   - Refuses `COMMITMENT_NOT_FOUND`: There is no such commitment.
   - Refuses `COMMITMENT_RETIRED`: This commitment is no longer active.
@@ -133,21 +147,31 @@ Defined in [ProofVerifying](../design/concepts/ProofVerifying.md), line 1.
 
 #### Actions
 
-- `submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle) : returns (proof: Proof)`
+- `submitProof(submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle, recurring?: Flag) : returns (proof: Proof)`
   - Refuses `EVIDENCE_REQUIRED`: At least one piece of evidence is required.
   - Refuses `PROOF_ALREADY_SUBMITTED`: Proof has already been submitted for this occurrence.
+  - Refuses `ONE_TIME_ALREADY_COMPLETED`: This one-time commitment has already been completed.
+- `resubmitProof(submitter: User, previousProof: Proof, evidence: EvidenceBundle) : returns (proof: Proof)`
+  - Refuses `PROOF_NOT_FOUND`: There is no such proof.
+  - Refuses `NOT_PROOF_AUTHOR`: Only the submitter can resubmit this proof.
+  - Refuses `PROOF_SUPERSEDED`: This proof has a newer submission.
+  - Refuses `PROOF_NOT_DISPUTED`: Only a disputed proof without verified reviews can be resubmitted.
+  - Refuses `EVIDENCE_REQUIRED`: At least one piece of evidence is required.
 - `reviewProof(reviewer: User, proof: Proof, decision: VerificationDecision, note: String) : returns (proof: Proof)`
   - Refuses `PROOF_NOT_FOUND`: There is no such proof.
   - Refuses `CANNOT_REVIEW_OWN_PROOF`: A user cannot review their own proof.
+  - Refuses `PROOF_SUPERSEDED`: This proof has a newer submission.
   - Refuses `PROOF_ALREADY_REVIEWED`: This user has already reviewed this proof.
 - `deletePendingProof(submitter: User, proof: Proof) : returns (proof: Proof)`
   - Refuses `PROOF_NOT_FOUND`: There is no such proof.
   - Refuses `NOT_PROOF_SUBMITTER`: Only the submitter can delete this proof.
   - Refuses `PROOF_HAS_REVIEWS`: A proof with peer reviews cannot be deleted.
+  - Refuses `PROOF_SUPERSEDED`: This proof has a newer submission.
 
 #### Queries
 
 - `_proof(proof: Proof) : optional (submitter: User, goal: Goal, commitment: Commitment, occurrence: DateTime, evidence: EvidenceBundle)`
+- `_proofAttempt(proof: Proof) : optional (attempt: Number, current: Flag)`
 - `_proofForOccurrence(commitment: Commitment, occurrence: DateTime) : optional (proof: Proof, submitter: User, goal: Goal, evidence: EvidenceBundle)`
 - `_proofsByCommitment(commitment: Commitment) : many (proof: Proof, submitter: User, goal: Goal, occurrence: DateTime, evidence: EvidenceBundle)`
 - `_verificationsByProof(proof: Proof) : many (reviewer: User, decision: VerificationDecision, note: String)`
@@ -248,7 +272,7 @@ Authored path: `BetterSelf.dashboard.GoalDetail`.
 - Covered by [Goal Management](../design/compositions/goals.md), line 24.
 
 ```former
-Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active, sourceStep, completion, occurrence, proof, evidence, reviewer, decision, note); promises exactly one record — forms:
+Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentContext, constraints, timeline, successDefinition, currentStrategy, group, commitment, description, recurring, schedule, active, sourceStep, completion, occurrence, proof, evidence, reviewer, attempt, current, decision, note); promises exactly one record — forms:
   a record of
     where GoalPlanning._goal (goal) has (constraints, currentContext, outcome, successDefinition, timeline)
     where whether GoalPlanning._goal (goal) has (currentStrategy)
@@ -272,7 +296,10 @@ Former "the detail of (goal)" — inputs (goal); bindings (outcome, currentConte
                     reviewer
         description
         proofs: each ProofVerifying._proofsByCommitment (commitment) has (evidence, occurrence, proof)
+          where ProofVerifying._proofAttempt (proof) has (attempt, current)
           form a record of
+            attempt
+            current
             evidence
             occurrence
             proof
@@ -339,6 +366,20 @@ Former "the observed results of (goal)" — inputs (goal); bindings (result, des
       result
 ```
 
+### the public groups matching (search)
+
+Authored path: `BetterSelf.groupManagement.PublicGroups`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 3.
+
+```former
+Former "the public groups matching (search)" — inputs (search); bindings (group, name, topic); promises exactly one record — forms:
+  each AccountabilityGrouping._publicGroups (search) has (group, name, topic)
+    form a record of
+      group
+      name
+      topic
+```
+
 ### the strategy state of (goal)
 
 Authored path: `BetterSelf.strategyState.StrategyState`.
@@ -366,22 +407,53 @@ Former "the review context of (goal)" — inputs (goal); bindings (); promises e
     state: former "the strategy state of (goal)" with (goal)
 ```
 
+### the settings of (group)
+
+Authored path: `BetterSelf.groupManagement.GroupSettings`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 5.
+
+```former
+Former "the settings of (group)" — inputs (group); bindings (owner, name, topic, visibility); promises exactly one record — forms:
+  a record of
+    where AccountabilityGrouping._groupSettings (group) has (name, owner, topic, visibility)
+    group
+    name
+    owner
+    topic
+    visibility
+```
+
 ### the shared proofs in (group)
 
 Authored path: `BetterSelf.dashboard.GroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 39.
 
 ```former
-Former "the shared proofs in (group)" — inputs (group); bindings (proof, submitter, goal, commitment, occurrence, evidence, reviewer, decision, note); promises exactly one record — forms:
+Former "the shared proofs in (group)" — inputs (group); bindings (proof, submitter, goal, commitment, occurrence, evidence, reviewer, decision, note, outcome, successDefinition, description, recurring, schedule, sourceStep, strategy, revision, attempt, current); promises exactly one record — forms:
   each AccountabilityGrouping._sharedProofs (group) has (proof)
     where ProofVerifying._proof (proof) has (commitment, evidence, goal, occurrence, submitter)
+    where ProofVerifying._proofAttempt (proof) has (attempt, current)
+    where whether GoalPlanning._goal (goal) has (outcome, successDefinition)
+    where whether CommitmentTracking._commitment (commitment) has (description, goal, recurring, schedule)
+    where whether CommitmentTracking._commitment (commitment) has (goal, sourceStep)
+    where whether GoalPlanning._strategySnapshot (goal) has (revision, strategy)
     form a record of
+      attempt
       commitment
+      current
+      description
       evidence
       goal
       occurrence
+      outcome
       proof
+      recurring
+      schedule
+      sourceStep
+      strategy
+      strategyRevision: revision
       submitter
+      successDefinition
       verifications: each ProofVerifying._verificationsByProof (proof) has (decision, note, reviewer)
         form a record of
           decision
@@ -666,7 +738,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 56.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 60.
 
 ```reaction
 when RequestBoundary.request (group, path: "/dashboard/group-proofs", requestId, session)
@@ -678,7 +750,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 56.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 60.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
@@ -694,7 +766,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 56.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 60.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
@@ -710,7 +782,7 @@ then
 
 Authored path: `BetterSelf.dashboard.ListGroupProofs`.
 - Covered by [Dashboard](../design/compositions/dashboard.md), line 35.
-- Covered by [Dashboard](../design/compositions/dashboard.md), line 56.
+- Covered by [Dashboard](../design/compositions/dashboard.md), line 60.
 
 ```reaction
 when Sessioning.current (session, subject: user), asked by BetterSelf.dashboard.ListGroupProofs
@@ -885,6 +957,171 @@ then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
 ```
 
+### BetterSelf.groupManagement.DeleteGroup
+
+Authored path: `BetterSelf.groupManagement.DeleteGroup`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 9.
+- Covered by [Group Management](../design/compositions/group-management.md), line 17.
+
+```reaction
+when RequestBoundary.request (group, path: "/groups/delete", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groupManagement.DeleteGroup#2
+
+Authored path: `BetterSelf.groupManagement.DeleteGroup`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 9.
+- Covered by [Group Management](../design/compositions/group-management.md), line 17.
+
+```reaction
+when Sessioning.current (session, subject: owner), asked by BetterSelf.groupManagement.DeleteGroup
+where
+  earlier, RequestBoundary.request (group, path: "/groups/delete", requestId, session)
+then
+  AccountabilityGrouping.deleteGroup (group, owner)
+```
+
+### BetterSelf.groupManagement.DeleteGroup#3
+
+Authored path: `BetterSelf.groupManagement.DeleteGroup`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 9.
+- Covered by [Group Management](../design/compositions/group-management.md), line 17.
+
+```reaction
+when AccountabilityGrouping.deleteGroup (group, owner), asked by BetterSelf.groupManagement.DeleteGroup#2
+where
+  earlier, RequestBoundary.request (group, path: "/groups/delete", requestId, session)
+then
+  RequestBoundary.respond (group, requestId)
+```
+
+### BetterSelf.groupManagement.GetGroupSettings
+
+Authored path: `BetterSelf.groupManagement.GetGroupSettings`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 5.
+- Covered by [Group Management](../design/compositions/group-management.md), line 15.
+
+```reaction
+when RequestBoundary.request (group, path: "/groups/settings", requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groupManagement.GetGroupSettings:authorized#2
+
+Authored path: `BetterSelf.groupManagement.GetGroupSettings`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 5.
+- Covered by [Group Management](../design/compositions/group-management.md), line 15.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groupManagement.GetGroupSettings
+where
+  earlier, RequestBoundary.request (group, path: "/groups/settings", requestId, session)
+  AccountabilityGrouping._group (group)
+  AccountabilityGrouping._members (group) has (user)
+then
+  RequestBoundary.respond (requestId, settings: former "the settings of (group)" with (group))
+```
+
+### BetterSelf.groupManagement.GetGroupSettings:forbidden#2
+
+Authored path: `BetterSelf.groupManagement.GetGroupSettings`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 5.
+- Covered by [Group Management](../design/compositions/group-management.md), line 15.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groupManagement.GetGroupSettings
+where
+  earlier, RequestBoundary.request (group, path: "/groups/settings", requestId, session)
+  AccountabilityGrouping._group (group)
+  no AccountabilityGrouping._members (group) has (user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.groupManagement.GetGroupSettings:missing#2
+
+Authored path: `BetterSelf.groupManagement.GetGroupSettings`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 5.
+- Covered by [Group Management](../design/compositions/group-management.md), line 15.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groupManagement.GetGroupSettings
+where
+  earlier, RequestBoundary.request (group, path: "/groups/settings", requestId, session)
+  no AccountabilityGrouping._group (group)
+then
+  RequestBoundary.respond (error: "GROUP_NOT_FOUND", requestId)
+```
+
+### BetterSelf.groupManagement.SearchPublicGroups
+
+Authored path: `BetterSelf.groupManagement.SearchPublicGroups`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 3.
+- Covered by [Group Management](../design/compositions/group-management.md), line 14.
+
+```reaction
+when RequestBoundary.request (path: "/dashboard/public-groups", requestId, search, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groupManagement.SearchPublicGroups#2
+
+Authored path: `BetterSelf.groupManagement.SearchPublicGroups`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 3.
+- Covered by [Group Management](../design/compositions/group-management.md), line 14.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.groupManagement.SearchPublicGroups
+where
+  earlier, RequestBoundary.request (path: "/dashboard/public-groups", requestId, search, session)
+then
+  RequestBoundary.respond (groups: former "the public groups matching (search)" with (search), requestId)
+```
+
+### BetterSelf.groupManagement.UpdateGroup
+
+Authored path: `BetterSelf.groupManagement.UpdateGroup`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 7.
+- Covered by [Group Management](../design/compositions/group-management.md), line 16.
+
+```reaction
+when RequestBoundary.request (group, name, path: "/groups/update", requestId, session, topic, visibility)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.groupManagement.UpdateGroup#2
+
+Authored path: `BetterSelf.groupManagement.UpdateGroup`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 7.
+- Covered by [Group Management](../design/compositions/group-management.md), line 16.
+
+```reaction
+when Sessioning.current (session, subject: owner), asked by BetterSelf.groupManagement.UpdateGroup
+where
+  earlier, RequestBoundary.request (group, name, path: "/groups/update", requestId, session, topic, visibility)
+then
+  AccountabilityGrouping.updateGroup (group, name, owner, topic, visibility)
+```
+
+### BetterSelf.groupManagement.UpdateGroup#3
+
+Authored path: `BetterSelf.groupManagement.UpdateGroup`.
+- Covered by [Group Management](../design/compositions/group-management.md), line 7.
+- Covered by [Group Management](../design/compositions/group-management.md), line 16.
+
+```reaction
+when AccountabilityGrouping.updateGroup (group, name, owner, topic, visibility), asked by BetterSelf.groupManagement.UpdateGroup#2
+where
+  earlier, RequestBoundary.request (group, name, path: "/groups/update", requestId, session, topic, visibility)
+then
+  RequestBoundary.respond (group, requestId)
+```
+
 ### BetterSelf.groups.AttachGoal
 
 Authored path: `BetterSelf.groups.AttachGoal`.
@@ -964,7 +1201,7 @@ Authored path: `BetterSelf.groups.CreateGroup`.
 - Covered by [Accountability Groups](../design/compositions/groups.md), line 18.
 
 ```reaction
-when RequestBoundary.request (name, path: "/groups/create", requestId, session, topic)
+when RequestBoundary.request (name, path: "/groups/create", requestId, session, topic, visibility)
 then
   Sessioning.current (session)
 ```
@@ -978,9 +1215,9 @@ Authored path: `BetterSelf.groups.CreateGroup`.
 ```reaction
 when Sessioning.current (session, subject: owner), asked by BetterSelf.groups.CreateGroup
 where
-  earlier, RequestBoundary.request (name, path: "/groups/create", requestId, session, topic)
+  earlier, RequestBoundary.request (name, path: "/groups/create", requestId, session, topic, visibility)
 then
-  AccountabilityGrouping.createGroup (name, owner, topic)
+  AccountabilityGrouping.createGroup (name, owner, topic, visibility)
 ```
 
 ### BetterSelf.groups.CreateGroup#3
@@ -990,9 +1227,9 @@ Authored path: `BetterSelf.groups.CreateGroup`.
 - Covered by [Accountability Groups](../design/compositions/groups.md), line 18.
 
 ```reaction
-when AccountabilityGrouping.createGroup (name, owner, topic, group), asked by BetterSelf.groups.CreateGroup#2
+when AccountabilityGrouping.createGroup (name, owner, topic, visibility, group), asked by BetterSelf.groups.CreateGroup#2
 where
-  earlier, RequestBoundary.request (name, path: "/groups/create", requestId, session, topic)
+  earlier, RequestBoundary.request (name, path: "/groups/create", requestId, session, topic, visibility)
 then
   RequestBoundary.respond (group, requestId)
 ```
@@ -1359,6 +1596,140 @@ then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
 ```
 
+### BetterSelf.proofResubmission.ResubmitProof
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+then
+  Sessioning.current (session)
+```
+
+### BetterSelf.proofResubmission.ResubmitProof:authorized#2
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofResubmission.ResubmitProof
+where
+  earlier, RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+  ProofVerifying._proof (proof: previousProof) has (commitment, goal, submitter: user)
+  CommitmentTracking._commitment (commitment) has (active: true, goal)
+then
+  ProofVerifying.resubmitProof (evidence, previousProof, submitter: user)
+```
+
+### BetterSelf.proofResubmission.ResubmitProof:authorized#3
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when ProofVerifying.resubmitProof (evidence, previousProof, submitter: user, proof), asked by BetterSelf.proofResubmission.ResubmitProof:authorized#2
+where
+  earlier, RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+then
+  RequestBoundary.respond (proof, requestId)
+```
+
+### BetterSelf.proofResubmission.ResubmitProof:forbidden#2
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofResubmission.ResubmitProof
+where
+  earlier, RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+  ProofVerifying._proof (proof: previousProof)
+  no ProofVerifying._proof (proof: previousProof) has (submitter: user)
+then
+  RequestBoundary.respond (error: "FORBIDDEN", requestId)
+```
+
+### BetterSelf.proofResubmission.ResubmitProof:missingCommitment#2
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofResubmission.ResubmitProof
+where
+  earlier, RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+  ProofVerifying._proof (proof: previousProof) has (commitment, goal, submitter: user)
+  no CommitmentTracking._commitment (commitment) has (goal)
+then
+  RequestBoundary.respond (error: "COMMITMENT_NOT_FOUND", requestId)
+```
+
+### BetterSelf.proofResubmission.ResubmitProof:missingProof#2
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofResubmission.ResubmitProof
+where
+  earlier, RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+  no ProofVerifying._proof (proof: previousProof)
+then
+  RequestBoundary.respond (error: "PROOF_NOT_FOUND", requestId)
+```
+
+### BetterSelf.proofResubmission.ResubmitProof:retired#2
+
+Authored path: `BetterSelf.proofResubmission.ResubmitProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 3.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 12.
+
+```reaction
+when Sessioning.current (session, subject: user), asked by BetterSelf.proofResubmission.ResubmitProof
+where
+  earlier, RequestBoundary.request (evidence, path: "/proofs/resubmit", previousProof, requestId, session)
+  ProofVerifying._proof (proof: previousProof) has (commitment, goal, submitter: user)
+  CommitmentTracking._commitment (commitment) has (active: false, goal)
+then
+  RequestBoundary.respond (error: "COMMITMENT_RETIRED", requestId)
+```
+
+### BetterSelf.proofResubmission.ShareResubmittedProof
+
+Authored path: `BetterSelf.proofResubmission.ShareResubmittedProof`.
+- Covered by [Proof Resubmission](../design/compositions/proof-resubmission.md), line 7.
+
+```reaction
+when ProofVerifying.resubmitProof (proof)
+where
+  ProofVerifying._proof (proof) has (goal)
+  AccountabilityGrouping._groupForGoal (goal)
+then
+  AccountabilityGrouping.shareProof (goal, proof)
+```
+
+### BetterSelf.proofSharing.ShareExistingProofsOnAttach
+
+Authored path: `BetterSelf.proofSharing.ShareExistingProofsOnAttach`.
+- Covered by [Proof Sharing](../design/compositions/proof-sharing.md), line 7.
+
+```reaction
+when AccountabilityGrouping.attachGoal (goal, group)
+where
+  CommitmentTracking._commitmentsByGoal (goal) has (commitment)
+  ProofVerifying._proofsByCommitment (commitment) has (goal, proof)
+  no AccountabilityGrouping._sharedProofs (group) has (proof)
+then
+  AccountabilityGrouping.shareProof (goal, proof)
+```
+
 ### BetterSelf.proofSharing.ShareProofWithGroup
 
 Authored path: `BetterSelf.proofSharing.ShareProofWithGroup`.
@@ -1375,7 +1746,7 @@ then
 ### BetterSelf.proofSharing.UnshareDeletedProof
 
 Authored path: `BetterSelf.proofSharing.UnshareDeletedProof`.
-- Covered by [Proof Sharing](../design/compositions/proof-sharing.md), line 9.
+- Covered by [Proof Sharing](../design/compositions/proof-sharing.md), line 13.
 
 ```reaction
 when ProofVerifying.deletePendingProof (proof)
@@ -1435,7 +1806,7 @@ then
   Sessioning.current (session)
 ```
 
-### BetterSelf.proofs.SubmitProof:alreadyCompleted#2
+### BetterSelf.proofs.SubmitProof:authorized#2
 
 Authored path: `BetterSelf.proofs.SubmitProof`.
 - Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
@@ -1446,90 +1817,38 @@ when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.Sub
 where
   earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
   GoalPlanning._goal (goal) has (owner: user)
-  CommitmentTracking._commitment (commitment) has (active: true, goal, recurring: false)
-  CommitmentTracking._completionsByCommitment (commitment)
-  no CommitmentTracking._completionsByCommitment (commitment) has (occurrence)
+  CommitmentTracking._commitment (commitment) has (goal)
 then
-  RequestBoundary.respond (error: "ONE_TIME_ALREADY_COMPLETED", requestId)
+  CommitmentTracking.checkProofSubmission (commitment, occurrence)
 ```
 
-### BetterSelf.proofs.SubmitProof:authorizedOneTime#2
+### BetterSelf.proofs.SubmitProof:authorized#3
 
 Authored path: `BetterSelf.proofs.SubmitProof`.
 - Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
 - Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
 
 ```reaction
-when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
+when CommitmentTracking.checkProofSubmission (commitment, occurrence, recurring), asked by BetterSelf.proofs.SubmitProof:authorized#2
 where
+  earlier, Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
   earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-  GoalPlanning._goal (goal) has (owner: user)
-  CommitmentTracking._commitment (commitment) has (active: true, goal, recurring: false)
-  no CommitmentTracking._completionsByCommitment (commitment)
 then
-  ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user)
+  ProofVerifying.submitProof (commitment, evidence, goal, occurrence, recurring, submitter: user)
 ```
 
-### BetterSelf.proofs.SubmitProof:authorizedOneTime#3
+### BetterSelf.proofs.SubmitProof:authorized#4
 
 Authored path: `BetterSelf.proofs.SubmitProof`.
 - Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
 - Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
 
 ```reaction
-when ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user, proof), asked by BetterSelf.proofs.SubmitProof:authorizedOneTime#2
+when ProofVerifying.submitProof (commitment, evidence, goal, occurrence, recurring, submitter: user, proof), asked by BetterSelf.proofs.SubmitProof:authorized#3
 where
   earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
 then
   RequestBoundary.respond (proof, requestId)
-```
-
-### BetterSelf.proofs.SubmitProof:authorizedRecurring#2
-
-Authored path: `BetterSelf.proofs.SubmitProof`.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
-
-```reaction
-when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
-where
-  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-  GoalPlanning._goal (goal) has (owner: user)
-  CommitmentTracking._commitment (commitment) has (active: true, goal, recurring: true)
-then
-  ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user)
-```
-
-### BetterSelf.proofs.SubmitProof:authorizedRecurring#3
-
-Authored path: `BetterSelf.proofs.SubmitProof`.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
-
-```reaction
-when ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user, proof), asked by BetterSelf.proofs.SubmitProof:authorizedRecurring#2
-where
-  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-then
-  RequestBoundary.respond (proof, requestId)
-```
-
-### BetterSelf.proofs.SubmitProof:existingProof#2
-
-Authored path: `BetterSelf.proofs.SubmitProof`.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
-
-```reaction
-when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
-where
-  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-  GoalPlanning._goal (goal) has (owner: user)
-  CommitmentTracking._commitment (commitment) has (active: true, goal, recurring: false)
-  CommitmentTracking._completionsByCommitment (commitment) has (occurrence)
-  ProofVerifying._proofForOccurrence (commitment, occurrence)
-then
-  RequestBoundary.respond (error: "PROOF_ALREADY_SUBMITTED", requestId)
 ```
 
 ### BetterSelf.proofs.SubmitProof:forbiddenGoal#2
@@ -1577,54 +1896,6 @@ where
   no GoalPlanning._goal (goal)
 then
   RequestBoundary.respond (error: "GOAL_NOT_FOUND", requestId)
-```
-
-### BetterSelf.proofs.SubmitProof:replaceDeletedProof#2
-
-Authored path: `BetterSelf.proofs.SubmitProof`.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
-
-```reaction
-when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
-where
-  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-  GoalPlanning._goal (goal) has (owner: user)
-  CommitmentTracking._commitment (commitment) has (active: true, goal, recurring: false)
-  CommitmentTracking._completionsByCommitment (commitment) has (occurrence)
-  no ProofVerifying._proofForOccurrence (commitment, occurrence)
-then
-  ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user)
-```
-
-### BetterSelf.proofs.SubmitProof:replaceDeletedProof#3
-
-Authored path: `BetterSelf.proofs.SubmitProof`.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
-
-```reaction
-when ProofVerifying.submitProof (commitment, evidence, goal, occurrence, submitter: user, proof), asked by BetterSelf.proofs.SubmitProof:replaceDeletedProof#2
-where
-  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-then
-  RequestBoundary.respond (proof, requestId)
-```
-
-### BetterSelf.proofs.SubmitProof:retiredCommitment#2
-
-Authored path: `BetterSelf.proofs.SubmitProof`.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 3.
-- Covered by [Proof Submission](../design/compositions/proofs.md), line 28.
-
-```reaction
-when Sessioning.current (session, subject: user), asked by BetterSelf.proofs.SubmitProof
-where
-  earlier, RequestBoundary.request (commitment, evidence, goal, occurrence, path: "/proofs/submit", requestId, session)
-  GoalPlanning._goal (goal) has (owner: user)
-  CommitmentTracking._commitment (commitment) has (active: false, goal)
-then
-  RequestBoundary.respond (error: "COMMITMENT_RETIRED", requestId)
 ```
 
 ### BetterSelf.proofs.SubmitProof:wrongGoal#2
@@ -2083,15 +2354,20 @@ not listed here have no explicit input contract.
 - `/dashboard/goals` — requires `session`
 - `/dashboard/group-proofs` — requires `session`, `group`
 - `/dashboard/groups` — requires `session`
+- `/dashboard/public-groups` — requires `session`, `search`
 - `/dashboard/results` — requires `session`, `goal`
 - `/dashboard/strategy-state` — requires `session`, `goal`
 - `/goals/create` — requires `session`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/goals/set-strategy` — requires `session`, `goal`, `strategy`
 - `/goals/update` — requires `session`, `goal`, `outcome`, `currentContext`, `constraints`, `timeline`, `successDefinition`
 - `/groups/attach-goal` — requires `session`, `group`, `goal`
-- `/groups/create` — requires `session`, `name`, `topic`
+- `/groups/create` — requires `session`, `name`, `topic`; fills `visibility` with "private" when absent
+- `/groups/delete` — requires `session`, `group`
 - `/groups/join` — requires `session`, `group`
+- `/groups/settings` — requires `session`, `group`
+- `/groups/update` — requires `session`, `group`, `name`, `topic`, `visibility`
 - `/proofs/delete` — requires `session`, `proof`
+- `/proofs/resubmit` — requires `session`, `previousProof`, `evidence`
 - `/proofs/review` — requires `session`, `proof`, `decision`, `note`
 - `/proofs/submit` — requires `session`, `goal`, `commitment`, `occurrence`, `evidence`
 - `/results/record` — requires `session`, `goal`, `description`, `observedOn`

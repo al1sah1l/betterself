@@ -1,11 +1,15 @@
 # Proof Sharing
 
-When a proof is successfully submitted for a goal that is attached to an accountability group, BetterSelf [automatically shares that proof with the group](reaction:BetterSelf.proofSharing.ShareProofWithGroup).
+When a proof is successfully submitted for a goal attached to an accountability group, BetterSelf [automatically shares that proof with the group](reaction:BetterSelf.proofSharing.ShareProofWithGroup).
 
-The reaction first checks whether the goal is attached to an accountability group. If an attachment exists, the submitted proof is shared with that group.
+If the goal is not attached to a group, proof submission and completion still succeed without sharing.
 
-If the goal is not attached to any accountability group, no sharing action occurs. Proof submission and completion still succeed normally.
+When a goal is successfully attached to a group, BetterSelf [shares its existing proofs with that group](reaction:BetterSelf.proofSharing.ShareExistingProofsOnAttach).
 
-When a pending proof is successfully deleted, the application [removes its group sharing references](reaction:BetterSelf.proofSharing.UnshareDeletedProof).
+This reaction selects the goal's commitments and their existing proofs, excluding proofs already shared with the group. It does not create new proofs, completion claims, or peer reviews.
+
+Before attaching a goal, the interface must explain that existing and future proofs will become visible to group members.
+
+When a pending proof is successfully deleted, BetterSelf [removes its group sharing references](reaction:BetterSelf.proofSharing.UnshareDeletedProof).
 
 Cleanup also succeeds when the proof was never shared. The separate completion claim is preserved.

@@ -50,7 +50,11 @@ Claims without matching proof remain visible with an empty proofs list.
 
 A group with no shared proofs returns an empty proof list.
 
+Shared group proofs include the current goal outcome and success definition, the commitment description and schedule, and its source-step reference together with the current strategy snapshot and revision. This context is returned only through the member-protected group proof endpoint. The interface resolves a strategy step only when the source reference matches the current revision; otherwise it reports that the previous step is unavailable. Missing context does not hide the proof. The interface defaults to proofs awaiting the current user's review and also offers All and My proofs filters. Own proofs are labeled Your proof and cannot be self-reviewed.
+
 A missing group returns `GROUP_NOT_FOUND`. A user who is not a group member receives `FORBIDDEN`.
+
+Goal detail and shared group proofs include each proof's attempt number and whether it is current. Previous attempts remain visible as history but cannot be reviewed. The To review filter excludes previous attempts. For an active commitment, the author can submit new evidence when the current attempt has disputed reviews and no verified reviews.
 
 ```endpoints
 BetterSelf.dashboard.ListGroupProofs at /dashboard/group-proofs

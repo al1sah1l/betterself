@@ -10,6 +10,7 @@ import { assemble } from "@mit-sdg/sync-engine/assembly";
 import { applicationConceptSet } from "../../src/concepts.ts";
 import {
   ShareProofWithGroup,
+  ShareExistingProofsOnAttach,
   UnshareDeletedProof,
 } from "../../src/compositions/proof-sharing.ts";
 
@@ -45,6 +46,7 @@ function assembleTestApplication() {
       BetterSelf: {
         proofSharing: {
           ShareProofWithGroup,
+          ShareExistingProofsOnAttach,
           UnshareDeletedProof,
         },
         proofs: {
@@ -325,4 +327,105 @@ test("deleting pending proof removes group reference and preserves completion cl
     });
 
   expect(cleaned).toEqual({ proof });
+});
+
+test("attaching a goal shares its existing proofs and excludes other goals", async () => {
+  const app = assembleTestApplication();
+  const group = await createGroup(app);
+
+  const created =
+    await app.concepts.CommitmentTracking.createCommitment({
+      goal: "goal-1",
+      description: "Apply to internships",
+      recurring: true,
+      schedule: "Every Monday",
+    });
+
+  if (
+    typeof created !== "object" ||
+    created === null ||
+    !("commitment" in created) ||
+    typeof created.commitment !== "string"
+  ) {
+    throw new Error("Could not create commitment.");
+  }
+
+  const firstProof = await submitProof(app, {
+    goal: "goal-1",
+    commitment: created.commitment,
+    occurrence: new Date("2026-10-12T17:00:00.000Z"),
+  });
+
+  const secondProof = await submitProof(app, {
+    goal: "goal-1",
+    commitment: created.commitment,
+    occurrence: new Date("2026-10-19T17:00:00.000Z"),
+  });
+
+  const otherCreated =
+    await app.concepts.CommitmentTracking.createCommitment({
+      goal: "goal-2",
+      description: "Read another book",
+      recurring: false,
+      schedule: "By Friday",
+    });
+
+  if (
+    typeof otherCreated !== "object" ||
+    otherCreated === null ||
+    !("commitment" in otherCreated) ||
+    typeof otherCreated.commitment !== "string"
+  ) {
+    throw new Error("Could not create another commitment.");
+  }
+
+  const otherProof = await submitProof(app, {
+    goal: "goal-2",
+    commitment: otherCreated.commitment,
+    occurrence: new Date("2026-10-12T17:00:00.000Z"),
+  });
+
+  await app.whenIdle();
+
+  expect(
+    await app.concepts.AccountabilityGrouping._sharedProofs({
+      group,
+    }),
+  ).toEqual([]);
+
+  const attached =
+    await app.concepts.AccountabilityGrouping.attachGoal({
+      group,
+      user: "maya",
+      goal: "goal-1",
+    });
+
+  expect(attached).toMatchObject({ group });
+
+  await app.whenIdle();
+
+  const shared =
+    await app.concepts.AccountabilityGrouping._sharedProofs({
+      group,
+    });
+
+  expect(shared.map((item) => item.proof).sort()).toEqual(
+    [firstProof, secondProof].sort(),
+  );
+
+  expect(
+    shared.some((item) => item.proof === otherProof),
+  ).toBe(false);
+
+  expect(
+    await app.concepts.ProofVerifying._proof({
+      proof: firstProof,
+    }),
+  ).toHaveLength(1);
+
+  expect(
+    await app.concepts.ProofVerifying._proof({
+      proof: secondProof,
+    }),
+  ).toHaveLength(1);
 });

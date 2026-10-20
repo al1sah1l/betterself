@@ -9,6 +9,7 @@ import {
   former,
   no,
   view,
+  whether,
   where,
 } from "@mit-sdg/sync-engine/language";
 
@@ -18,6 +19,8 @@ const {
   Sessioning,
   AccountabilityGrouping,
   ProofVerifying,
+  GoalPlanning,
+  CommitmentTracking,
 } = concepts;
 
 export const GroupMember = view(
@@ -26,7 +29,9 @@ export const GroupMember = view(
     where(
       AccountabilityGrouping._members({
         group,
-      }).is({ user }),
+      }).is({
+        user,
+      }),
     ),
 ).holds();
 
@@ -44,21 +49,80 @@ export const GroupProofs = former(
       reviewer,
       decision,
       note,
+      outcome,
+      successDefinition,
+      description,
+      recurring,
+      schedule,
+      sourceStep,
+      strategy,
+      revision,
+      attempt,
+      current,
     },
   ) =>
     each(
       AccountabilityGrouping._sharedProofs({
         group,
-      }).is({ proof }),
+      }).is({
+        proof,
+      }),
     )
       .where(
-        ProofVerifying._proof({ proof }).is({
+        ProofVerifying._proof({
+          proof,
+        }).is({
           submitter,
           goal,
           commitment,
           occurrence,
           evidence,
         }),
+
+        ProofVerifying._proofAttempt({
+          proof,
+        }).is({
+          attempt,
+          current,
+        }),
+
+        whether(
+          GoalPlanning._goal({
+            goal,
+          }).is({
+            outcome,
+            successDefinition,
+          }),
+        ),
+
+        whether(
+          CommitmentTracking._commitment({
+            commitment,
+          }).is({
+            goal,
+            description,
+            recurring,
+            schedule,
+          }),
+        ),
+
+        whether(
+          CommitmentTracking._commitment({
+            commitment,
+          }).is({
+            goal,
+            sourceStep,
+          }),
+        ),
+
+        whether(
+          GoalPlanning._strategySnapshot({
+            goal,
+          }).is({
+            strategy,
+            revision,
+          }),
+        ),
       )
       .form({
         proof,
@@ -67,6 +131,17 @@ export const GroupProofs = former(
         commitment,
         occurrence,
         evidence,
+        outcome,
+        successDefinition,
+        description,
+        recurring,
+        schedule,
+        sourceStep,
+        strategy,
+        strategyRevision: revision,
+        attempt,
+        current,
+
         verifications: each(
           ProofVerifying._verificationsByProof({
             proof,
@@ -103,11 +178,17 @@ export const ListGroupProofs = endpoint(
           AccountabilityGrouping._group({
             group,
           }).is({}),
-          GroupMember({ user, group }).is({}),
+
+          GroupMember({
+            user,
+            group,
+          }).is({}),
         )
           .then(
             respond({
-              proofs: GroupProofs({ group }),
+              proofs: GroupProofs({
+                group,
+              }),
             }),
           )
           .named("authorized"),
@@ -130,8 +211,12 @@ export const ListGroupProofs = endpoint(
           AccountabilityGrouping._group({
             group,
           }).is({}),
+
           no(
-            GroupMember({ user, group }).is({}),
+            GroupMember({
+              user,
+              group,
+            }).is({}),
           ),
         )
           .then(

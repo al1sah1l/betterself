@@ -17,13 +17,8 @@ const results = ref<Observation[]>([]);
 const description = ref("");
 
 const today = new Date();
-
 const observedOn = ref(
-  `${today.getFullYear()}-${String(
-    today.getMonth() + 1,
-  ).padStart(2, "0")}-${String(
-    today.getDate(),
-  ).padStart(2, "0")}`,
+  `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`,
 );
 
 const busy = ref(false);
@@ -35,19 +30,15 @@ function message(cause: unknown): string {
     if (cause.code === "UNAUTHORIZED") {
       return "Your session has expired. Please sign in again.";
     }
-
     if (cause.code === "FORBIDDEN") {
       return "You do not have access to these results.";
     }
-
     if (cause.code === "INVALID_REQUEST") {
       return "Enter a valid date and a result of 1–2000 characters.";
     }
-
     if (cause.code === "NOT_FOUND") {
       return "The goal or result could not be found.";
     }
-
     return "Could not update results. Please try again.";
   }
 
@@ -56,13 +47,29 @@ function message(cause: unknown): string {
     : "Could not update results.";
 }
 
+function formatDate(value: string): string {
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) return value;
+
+  return new Date(year, month - 1, day).toLocaleDateString(
+    undefined,
+    {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    },
+  );
+}
+
 async function refresh() {
-  const response = await api<{
-    results: Observation[];
-  }>("/dashboard/results", {
-    session: props.session,
-    goal: props.goal,
-  });
+  const response = await api<{ results: Observation[] }>(
+    "/dashboard/results",
+    {
+      session: props.session,
+      goal: props.goal,
+    },
+  );
 
   results.value = response.results;
 }
@@ -90,13 +97,8 @@ async function record() {
 
   const text = description.value.trim();
 
-  if (
-    !text ||
-    text.length > 2000 ||
-    !observedOn.value
-  ) {
-    error.value =
-      "Enter a date and a result of 1–2000 characters.";
+  if (!text || text.length > 2000 || !observedOn.value) {
+    error.value = "Enter a date and a result of 1–2000 characters.";
     return;
   }
 
@@ -126,12 +128,8 @@ async function record() {
 }
 
 async function remove(result: string) {
-  if (
-    busy.value ||
-    !window.confirm("Delete this observed result?")
-  ) {
-    return;
-  }
+  if (busy.value) return;
+  if (!window.confirm("Delete this observed result?")) return;
 
   busy.value = true;
   error.value = "";
@@ -165,87 +163,116 @@ onMounted(load);
     aria-label="Observed results"
     :aria-busy="busy"
   >
-    <h3>Observed results</h3>
+    <header class="results-heading">
+      <p class="eyebrow">Beyond checking boxes</p>
+      <h3>Observed results</h3>
+      <p class="muted">
+        What changed because of your efforts? Record outcomes
+        separately from completed actions and peer verification.
+      </p>
+    </header>
 
-    <p class="muted">
-      What changed because of your efforts? Record outcomes
-      separately from actions completed and peer verification.
-    </p>
+    <div class="record-panel">
+      <h4>Record an outcome</h4>
+      <p class="panel-description">
+        Capture an improvement, a setback, or something you learned.
+      </p>
 
-    <form @submit.prevent="record">
-      <fieldset :disabled="busy">
-        <label :for="`result-date-${props.goal}`">
-          Observed on
-        </label>
+      <form @submit.prevent="record">
+        <fieldset :disabled="busy">
+          <div class="date-field">
+            <label :for="`result-date-${props.goal}`">
+              Observed on
+            </label>
+            <input
+              :id="`result-date-${props.goal}`"
+              v-model="observedOn"
+              type="date"
+              required
+            />
+          </div>
 
-        <input
-          :id="`result-date-${props.goal}`"
-          v-model="observedOn"
-          type="date"
-          required
-        />
+          <label :for="`result-text-${props.goal}`">
+            What happened?
+          </label>
+          <textarea
+            :id="`result-text-${props.goal}`"
+            v-model="description"
+            :aria-describedby="`result-hint-${props.goal}`"
+            rows="4"
+            maxlength="2000"
+            required
+            placeholder="For example: Received two interview invitations this week."
+          />
 
-        <label :for="`result-text-${props.goal}`">
-          What happened?
-        </label>
+          <div class="form-footer">
+            <span
+              :id="`result-hint-${props.goal}`"
+              class="character-count"
+            >
+              {{ description.length }} / 2000 characters
+            </span>
 
-        <textarea
-          :id="`result-text-${props.goal}`"
-          v-model="description"
-          rows="3"
-          maxlength="2000"
-          required
-          placeholder="For example: Received two interview invitations this week."
-        />
-
-        <button class="primary" type="submit">
-          {{ busy ? "Please wait..." : "Record result" }}
-        </button>
-      </fieldset>
-    </form>
+            <button class="primary" type="submit">
+              {{ busy ? "Please wait..." : "Record result" }}
+            </button>
+          </div>
+        </fieldset>
+      </form>
+    </div>
 
     <p v-if="error" class="error" role="alert">
       {{ error }}
     </p>
-
-    <p v-if="success" role="status">
+    <p v-if="success" class="success-message" role="status">
       {{ success }}
     </p>
-
-    <p v-if="busy" role="status">
+    <p v-if="busy" class="muted" role="status">
       Updating results...
     </p>
 
-    <ul v-if="results.length">
+    <header class="history-heading">
+      <h4>Result history</h4>
+      <span class="result-count">
+        {{ results.length }}
+      </span>
+    </header>
+
+    <ul v-if="results.length" class="result-list">
       <li
         v-for="item in results"
         :key="item.result"
+        class="result-card"
       >
-        <time :datetime="item.observedOn">
-          {{ item.observedOn }}
-        </time>
+        <header class="result-card-header">
+          <time :datetime="item.observedOn">
+            {{ formatDate(item.observedOn) }}
+          </time>
 
-        <p class="observation">
-          {{ item.description }}
-        </p>
+          <button
+            class="text-button delete-button"
+            type="button"
+            :disabled="busy"
+            @click="remove(item.result)"
+          >
+            Delete result
+          </button>
+        </header>
 
-        <button
-          class="text-button"
-          type="button"
-          :disabled="busy"
-          @click="remove(item.result)"
-        >
-          Delete result
-        </button>
+        <p class="observation">{{ item.description }}</p>
       </li>
     </ul>
 
-    <p
+    <div
       v-else-if="!busy && !error"
-      class="muted"
+      class="empty-state"
     >
-      No observed results yet.
-    </p>
+      <strong>Your results will appear here</strong>
+      <p>
+        Your first observation gives you a starting point for
+        understanding whether your strategy is working.
+      </p>
+    </div>
 
     <button
       class="text-button"
@@ -260,36 +287,211 @@ onMounted(load);
 
 <style scoped>
 .observed-results {
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid var(--border);
+  margin-top: 24px;
+  overflow-wrap: anywhere;
+}
+
+.results-heading {
+  margin-bottom: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.results-heading h3 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.3;
+}
+
+.results-heading .muted {
+  max-width: 65ch;
+  margin: 12px 0 0;
+}
+
+.record-panel {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--background);
+}
+
+.record-panel h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.panel-description {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+fieldset {
+  min-width: 0;
+  margin-top: 20px;
+}
+
+.date-field {
+  display: grid;
+  gap: 8px;
+  max-width: 240px;
+}
+
+input,
+textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.date-field input {
+  margin-bottom: 0;
 }
 
 textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font: inherit;
+  line-height: 1.6;
   resize: vertical;
 }
 
+input:focus-visible,
 textarea:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
 }
 
-li {
-  margin-top: 20px;
+.form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.character-count {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.success-message {
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #eee8fb;
+  color: #6041b1;
+  line-height: 1.6;
+}
+
+.history-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 32px 0 16px;
+}
+
+.history-heading h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.result-count {
+  min-width: 26px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--muted);
+  text-align: center;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.result-list {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.result-card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px rgb(41 36 59 / 4%);
+}
+
+.result-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 time {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.delete-button {
+  margin: 0;
+  color: #a32939;
+  font-size: 12px;
 }
 
 .observation {
+  margin: 16px 0 0;
+  line-height: 1.7;
   white-space: pre-wrap;
-  overflow-wrap: anywhere;
+}
+
+.empty-state {
+  padding: 28px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty-state strong {
+  color: var(--text);
+}
+
+.empty-state p {
+  max-width: 50ch;
+  margin: 10px auto 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+@media (max-width: 600px) {
+  .record-panel,
+  .result-card {
+    padding: 18px;
+  }
+
+  .date-field {
+    max-width: none;
+  }
+
+  .form-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }
 </style>

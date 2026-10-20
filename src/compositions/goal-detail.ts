@@ -45,6 +45,8 @@ export const GoalDetail = former(
       proof,
       evidence,
       reviewer,
+      attempt,
+      current,
       decision,
       note,
     },
@@ -113,24 +115,35 @@ export const GoalDetail = former(
               occurrence,
               evidence,
             }),
-          ).form({
-            proof,
-            occurrence,
-            evidence,
-            verifications: each(
-              ProofVerifying._verificationsByProof({
+          )
+            .where(
+              ProofVerifying._proofAttempt({
                 proof,
               }).is({
+                attempt,
+                current,
+              }),
+            )
+            .form({
+              proof,
+              occurrence,
+              evidence,
+              attempt,
+              current,
+              verifications: each(
+                ProofVerifying._verificationsByProof({
+                  proof,
+                }).is({
+                  reviewer,
+                  decision,
+                  note,
+                }),
+              ).form({
                 reviewer,
                 decision,
                 note,
               }),
-            ).form({
-              reviewer,
-              decision,
-              note,
             }),
-          }),
           completions: each(
             CommitmentTracking._completionsByCommitment({
               commitment,

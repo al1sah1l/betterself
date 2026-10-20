@@ -36,12 +36,12 @@ function ensureReady(
   let ready = readiness.get(completions);
 
   if (!ready) {
-    ready = Promise.all([
-      completions.createIndex(
+    ready = completions
+      .createIndex(
         { commitment: 1, claimKey: 1 },
         { unique: true },
-      ),
-    ]).then(() => undefined);
+      )
+      .then(() => undefined);
 
     readiness.set(completions, ready);
   }
@@ -89,13 +89,62 @@ export class CommitmentTrackingConcept<Goal extends string> {
       recurring,
       schedule,
       ...(sourceStep !== undefined && sourceStep !== ""
-      ? { sourceStep }
-      : {}),
+        ? { sourceStep }
+        : {}),
       active: true,
       createdAt: new Date(),
     });
 
     return { commitment };
+  }
+
+  async checkProofSubmission({
+    commitment,
+    occurrence,
+  }: {
+    commitment: string;
+    occurrence: Date;
+  }) {
+    await ensureReady(this.completions);
+
+    const existingCommitment =
+      await this.commitments.findOne({
+        _id: commitment,
+      });
+
+    if (!existingCommitment) {
+      throw new CommitmentNotFound(
+        "There is no such commitment.",
+      );
+    }
+
+    if (!existingCommitment.active) {
+      throw new CommitmentRetired(
+        "This commitment is no longer active.",
+      );
+    }
+
+    if (!existingCommitment.recurring) {
+      const existingCompletion =
+        await this.completions.findOne({
+          commitment,
+        });
+
+      if (
+        existingCompletion &&
+        existingCompletion.occurrence.getTime() !==
+          occurrence.getTime()
+      ) {
+        throw new OneTimeAlreadyCompleted(
+          "This one-time commitment has already been completed.",
+        );
+      }
+    }
+
+    return {
+      commitment,
+      recurring: existingCommitment.recurring,
+    };
   }
 
   async claimComplete({

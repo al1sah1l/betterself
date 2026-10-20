@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from "vue";
+import { nextTick, onMounted, ref, computed } from "vue";
 import { api, ApiError } from "./api";
 import StrategyProposal from "./StrategyProposal.vue";
 import CreateCommitment from "./CreateCommitment.vue";
 import AttachGoal from "./AttachGoal.vue";
 import SubmitProof from "./SubmitProof.vue";
+import ResubmitProof from "./ResubmitProof.vue";
+import EvidenceText from "./EvidenceText.vue";
 
 const props = defineProps<{
   session: string;
@@ -35,6 +37,8 @@ type SubmittedProof = {
   proof: string;
   occurrence: string;
   evidence: string[];
+  attempt: number;
+  current: boolean;
   verifications: Verification[];
 };
 
@@ -65,6 +69,37 @@ const detail = ref<GoalData | null>(null);
 const strategyRevision = ref("initial");
 const loading = ref(false);
 const error = ref("");
+
+type CommitmentFilter = "all" | "active" | "retired";
+
+const commitmentFilter = ref<CommitmentFilter>("all");
+
+const filteredCommitments = computed(() => {
+  const commitments = detail.value?.commitments ?? [];
+
+  if (commitmentFilter.value === "active") {
+    return commitments.filter((commitment) => commitment.active);
+  }
+
+  if (commitmentFilter.value === "retired") {
+    return commitments.filter((commitment) => !commitment.active);
+  }
+
+  return commitments;
+});
+
+const commitmentCounts = computed(() => {
+  const commitments = detail.value?.commitments ?? [];
+  const active = commitments.filter(
+    (commitment) => commitment.active,
+  ).length;
+
+  return {
+    all: commitments.length,
+    active,
+    retired: commitments.length - active,
+  };
+});
 
 const deletingProof = ref("");
 const deleteError = ref("");
@@ -103,6 +138,35 @@ function hasCommitmentForStep(index: number): boolean {
         commitment.sourceStep === sourceStepFor(index),
     ) ?? false
   );
+}
+
+async function viewCommitmentForStep(index: number) {
+  const commitment = detail.value?.commitments.find(
+    (item) =>
+      item.active &&
+      item.sourceStep === sourceStepFor(index),
+  );
+
+  if (!commitment) return;
+
+  commitmentFilter.value = "active";
+  await nextTick();
+
+  const card = document.getElementById(
+    `commitment-${commitment.commitment}`,
+  );
+
+  if (!card) return;
+
+  const reducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+
+  card.focus({ preventScroll: true });
+  card.scrollIntoView({
+    behavior: reducedMotion ? "instant" : "smooth",
+    block: "center",
+  });
 }
 
 function closeCommitment() {
@@ -171,6 +235,18 @@ async function loadDetail() {
   } finally {
     loading.value = false;
   }
+}
+
+function canResubmit(proof: SubmittedProof): boolean {
+  return (
+    proof.current &&
+    proof.verifications.some(
+      (review) => review.decision === "disputed",
+    ) &&
+    !proof.verifications.some(
+      (review) => review.decision === "verified",
+    )
+  );
 }
 
 function proofStatus(proof: SubmittedProof) {
@@ -316,9 +392,14 @@ onMounted(loadDetail);
                 + Create commitment
               </button>
 
-              <p v-else class="step-connected">
-                Active commitment created
-              </p>
+              <button
+                v-else
+                class="text-button"
+                type="button"
+                @click="viewCommitmentForStep(index)"
+              >
+                View commitment ↓
+              </button>
             </div>
           </li>
         </ol>
@@ -374,10 +455,38 @@ onMounted(loadDetail);
           {{ deleteSuccess }}
         </p>
 
-        <ul v-if="detail.commitments.length" class="commitment-list">
+        <div class="commitment-filters" role="group" aria-label="Filter commitments">
+          <button
+            type="button"
+            :aria-pressed="commitmentFilter === 'all'"
+            @click="commitmentFilter = 'all'"
+          >
+            All ({{ commitmentCounts.all }})
+          </button>
+
+          <button
+            type="button"
+            :aria-pressed="commitmentFilter === 'active'"
+            @click="commitmentFilter = 'active'"
+          >
+            Active ({{ commitmentCounts.active }})
+          </button>
+
+          <button
+            type="button"
+            :aria-pressed="commitmentFilter === 'retired'"
+            @click="commitmentFilter = 'retired'"
+          >
+            Retired ({{ commitmentCounts.retired }})
+          </button>
+        </div>
+
+        <ul v-if="filteredCommitments.length" class="commitment-list">
           <li
-            v-for="commitment in detail.commitments"
+            v-for="commitment in filteredCommitments"
             :key="commitment.commitment"
+            :id="`commitment-${commitment.commitment}`"
+            tabindex="-1"
             class="commitment-card"
             :class="{ 'commitment-card--retired': !commitment.active }"
           >
@@ -411,6 +520,10 @@ onMounted(loadDetail);
                   :key="proof.proof"
                   class="proof-card"
                 >
+                  <p class="attempt-label">
+                    Attempt {{ proof.attempt }}
+                    · {{ proof.current ? "Current" : "Previous attempt" }}
+                  </p>
                   <p class="proof-date">
                     Completed
                     <time :datetime="proof.occurrence">
@@ -423,7 +536,7 @@ onMounted(loadDetail);
                       v-for="(item, index) in proof.evidence"
                       :key="index"
                     >
-                      {{ item }}
+                      <EvidenceText :text="item" />
                     </li>
                   </ul>
 
@@ -468,6 +581,12 @@ onMounted(loadDetail);
                         : "Delete pending proof"
                     }}
                   </button>
+                  <ResubmitProof
+                    v-if="commitment.active && canResubmit(proof)"
+                    :session="props.session"
+                    :proof="proof.proof"
+                    @submitted="loadDetail"
+                  />
                 </li>
               </ul>
 
@@ -502,7 +621,13 @@ onMounted(loadDetail);
         </ul>
 
         <p v-else class="empty-state">
-          No commitments yet. Start with a strategy step or add your own.
+          {{
+            commitmentCounts.all === 0
+              ? "No commitments yet. Start with a strategy step or add your own."
+              : commitmentFilter === "active"
+                ? "No active commitments."
+                : "No retired commitments."
+          }}
         </p>
       </section>
     </template>
@@ -662,13 +787,6 @@ dd {
   margin-top: 4px;
 }
 
-.step-connected {
-  margin: 12px 0 0;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 600;
-}
-
 .accountability-panel {
   margin-top: 28px;
   padding: 20px 24px;
@@ -703,6 +821,12 @@ dd {
   border-radius: 18px;
   background: var(--surface);
   box-shadow: 0 3px 12px rgb(41 36 59 / 4%);
+  scroll-margin-block: 24px;
+}
+
+.commitment-card:focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 4px;
 }
 
 .commitment-card--retired {
@@ -980,4 +1104,42 @@ dd {
     padding: 20px;
   }
 }
+
+.commitment-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.commitment-filters button {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.commitment-filters button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.commitment-filters button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.attempt-label {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
 </style>

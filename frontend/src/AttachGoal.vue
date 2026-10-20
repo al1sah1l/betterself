@@ -52,12 +52,12 @@ async function loadGroups() {
   error.value = "";
 
   try {
-    const result = await api<{ groups: Group[] }>(
+    const response = await api<{ groups: Group[] }>(
       "/dashboard/groups",
       { session: props.session },
     );
 
-    groups.value = result.groups;
+    groups.value = response.groups;
 
     if (!groups.value.some((group) => group.group === selectedGroup.value)) {
       selectedGroup.value = "";
@@ -75,8 +75,20 @@ async function attachGoal() {
   error.value = "";
   success.value = "";
 
-  if (!selectedGroup.value) {
+  const group = groups.value.find(
+    (item) => item.group === selectedGroup.value,
+  );
+
+  if (!group) {
     error.value = "Choose a group.";
+    return;
+  }
+
+  if (
+    !window.confirm(
+      `Attach this goal to "${group.name}"? Its existing and future proofs, including evidence and peer reviews, will be visible to group members.`,
+    )
+  ) {
     return;
   }
 
@@ -88,15 +100,11 @@ async function attachGoal() {
       {
         session: props.session,
         goal: props.goal,
-        group: selectedGroup.value,
+        group: group.group,
       },
     );
 
-    const group = groups.value.find(
-      (item) => item.group === result.group,
-    );
-
-    success.value = `Goal attached to ${group?.name ?? "the group"}.`;
+    success.value = `Goal attached to ${group.name}.`;
     emit("attached", result.group);
   } catch (cause) {
     error.value = errorMessage(cause);
@@ -109,12 +117,13 @@ onMounted(loadGroups);
 </script>
 
 <template>
-  <section aria-label="Goal accountability group">
+  <section class="attach-panel" aria-label="Goal accountability group">
     <h3>Accountability group</h3>
 
     <p class="muted">
-      Attach this goal to one group. Future proof submissions will be
-      shared with its members.
+      Attach this goal to one of your groups for peer feedback.
+      Existing and future proofs, their evidence, and reviews will
+      become visible to group members.
     </p>
 
     <p v-if="success" role="status">{{ success }}</p>
@@ -122,14 +131,15 @@ onMounted(loadGroups);
     <template v-else>
       <p v-if="loading" role="status">Loading groups...</p>
 
-      <form
-        v-else-if="groups.length"
-        @submit.prevent="attachGoal"
-      >
+      <form v-else-if="groups.length" @submit.prevent="attachGoal">
         <fieldset :disabled="saving">
-          <label for="goal-group">Group</label>
+          <label :for="`goal-group-${props.goal}`">Group</label>
 
-          <select id="goal-group" v-model="selectedGroup" required>
+          <select
+            :id="`goal-group-${props.goal}`"
+            v-model="selectedGroup"
+            required
+          >
             <option disabled value="">Choose a group</option>
             <option
               v-for="group in groups"
@@ -147,7 +157,8 @@ onMounted(loadGroups);
       </form>
 
       <p v-else-if="!error" class="muted">
-        Create or join a group first, then reload the list.
+        Open Groups to create or join a group, then reload this list.
+        You can still submit proof before joining a group.
       </p>
 
       <button
@@ -165,6 +176,23 @@ onMounted(loadGroups);
 </template>
 
 <style scoped>
+.attach-panel {
+  margin-top: 28px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--background);
+}
+
+h3 {
+  margin: 0;
+  font-size: 18px;
+}
+
+fieldset {
+  min-width: 0;
+}
+
 select {
   width: 100%;
   padding: 12px;
@@ -177,6 +205,12 @@ select {
 
 select:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .attach-panel {
+    padding: 18px;
+  }
 }
 </style>

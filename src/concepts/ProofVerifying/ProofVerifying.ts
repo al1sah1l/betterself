@@ -11,12 +11,13 @@ export class ProofAlreadyReviewed extends Error {}
 export class EvidenceRequired extends Error {}
 export class NotProofSubmitter extends Error {}
 export class ProofHasReviews extends Error {}
+export class NotProofAuthor extends Error {}
+export class ProofNotDisputed extends Error {}
+export class ProofSuperseded extends Error {}
+export class ProofOneTimeAlreadyCompleted extends Error {}
 
 export type VerificationDecision = "verified" | "disputed";
-
-export type EvidenceBundle<
-  Evidence extends string,
-> = Evidence[];
+export type EvidenceBundle<Evidence extends string> = Evidence[];
 
 interface ProofDocument<
   User extends string,
@@ -31,6 +32,9 @@ interface ProofDocument<
   occurrence: Date;
   evidence: Evidence[];
   createdAt: Date;
+  previousProof?: string;
+  attempt?: number;
+  singleUse?: boolean;
 }
 
 interface VerificationDocument<User extends string> {
@@ -43,45 +47,14 @@ interface VerificationDocument<User extends string> {
 }
 
 const readiness = new WeakMap<object, Promise<void>>();
+const mutationTails = new WeakMap<object, Promise<void>>();
 
-function ensureReady<
-  User extends string,
-  Goal extends string,
-  Commitment extends string,
-  Evidence extends string,
->(
-  proofs: Collection<
-    ProofDocument<User, Goal, Commitment, Evidence>
-  >,
-  verifications: Collection<VerificationDocument<User>>,
-) {
-  let ready = readiness.get(proofs);
-
-  if (!ready) {
-    ready = Promise.all([
-      proofs.createIndex(
-        { commitment: 1, occurrence: 1 },
-        { unique: true },
-      ),
-      verifications.createIndex(
-        { proof: 1, reviewer: 1 },
-        { unique: true },
-      ),
-    ]).then(() => undefined);
-
-    readiness.set(proofs, ready);
-  }
-
-  return ready;
-}
-
-async function withProofLock<T>(
-  operations: Map<string, Promise<void>>,
-  proof: string,
+async function withMutationLock<T>(
+  db: Db,
   operation: () => Promise<T>,
 ): Promise<T> {
   const previous =
-    operations.get(proof) ?? Promise.resolve();
+    mutationTails.get(db) ?? Promise.resolve();
 
   let release!: () => void;
 
@@ -91,7 +64,7 @@ async function withProofLock<T>(
 
   const tail = previous.then(() => current);
 
-  operations.set(proof, tail);
+  mutationTails.set(db, tail);
 
   await previous;
 
@@ -100,8 +73,8 @@ async function withProofLock<T>(
   } finally {
     release();
 
-    if (operations.get(proof) === tail) {
-      operations.delete(proof);
+    if (mutationTails.get(db) === tail) {
+      mutationTails.delete(db);
     }
   }
 }
@@ -116,21 +89,91 @@ export class ProofVerifyingConcept<
     ProofDocument<User, Goal, Commitment, Evidence>
   >;
 
+  private readonly attempts: Collection<
+    ProofDocument<User, Goal, Commitment, Evidence>
+  >;
+
   private readonly verifications: Collection<
     VerificationDocument<User>
   >;
 
-  private readonly proofOperations =
-    new Map<string, Promise<void>>();
-
-  constructor(db: Db) {
+  constructor(private readonly db: Db) {
     this.proofs = db.collection<
       ProofDocument<User, Goal, Commitment, Evidence>
     >("proofVerifying.proofs");
 
+    this.attempts = db.collection<
+      ProofDocument<User, Goal, Commitment, Evidence>
+    >("proofVerifying.attempts");
+
     this.verifications = db.collection<
       VerificationDocument<User>
     >("proofVerifying.verifications");
+  }
+
+  async #ready(): Promise<void> {
+    let ready = readiness.get(this.proofs);
+
+    if (!ready) {
+      ready = Promise.all([
+        this.proofs.createIndex(
+          { commitment: 1, occurrence: 1 },
+          { unique: true },
+        ),
+
+        this.proofs.createIndex(
+          { commitment: 1 },
+          {
+            name: "one_initial_proof_per_one_time_commitment",
+            unique: true,
+            partialFilterExpression: {
+              singleUse: true,
+            },
+          },
+        ),
+
+        this.attempts.createIndex(
+          { previousProof: 1 },
+          { unique: true },
+        ),
+
+        this.verifications.createIndex(
+          { proof: 1, reviewer: 1 },
+          { unique: true },
+        ),
+      ]).then(() => undefined);
+
+      readiness.set(this.proofs, ready);
+    }
+
+    await ready;
+  }
+
+  async #findProof(proof: string) {
+    const original = await this.proofs.findOne({
+      _id: proof,
+    });
+
+    if (original) {
+      return original;
+    }
+
+    return this.attempts.findOne({
+      _id: proof,
+    });
+  }
+
+  async #proofRows(commitment: Commitment) {
+    const [originals, attempts] = await Promise.all([
+      this.proofs.find({ commitment }).toArray(),
+      this.attempts.find({ commitment }).toArray(),
+    ]);
+
+    return [...originals, ...attempts].sort(
+      (left, right) =>
+        left.createdAt.getTime() - right.createdAt.getTime() ||
+        left._id.localeCompare(right._id),
+    );
   }
 
   async submitProof({
@@ -139,12 +182,14 @@ export class ProofVerifyingConcept<
     commitment,
     occurrence,
     evidence,
+    recurring = true,
   }: {
     submitter: User;
     goal: Goal;
     commitment: Commitment;
     occurrence: Date;
     evidence: EvidenceBundle<Evidence>;
+    recurring?: boolean;
   }) {
     const uniqueEvidence = [...new Set(evidence)];
 
@@ -154,34 +199,170 @@ export class ProofVerifyingConcept<
       );
     }
 
-    await ensureReady(this.proofs, this.verifications);
+    return withMutationLock(this.db, async () => {
+      await this.#ready();
 
-    const proof = crypto.randomUUID();
+      const existingProofs =
+        await this.#proofRows(commitment);
 
-    try {
-      await this.proofs.insertOne({
-        _id: proof,
-        submitter,
-        goal,
-        commitment,
-        occurrence,
-        evidence: uniqueEvidence,
-        createdAt: new Date(),
-      });
-    } catch (error) {
-      if (
-        error instanceof MongoServerError &&
-        error.code === 11000
-      ) {
+      const sameOccurrence = existingProofs.some(
+        (existing) =>
+          existing.occurrence.getTime() ===
+          occurrence.getTime(),
+      );
+
+      if (sameOccurrence) {
         throw new ProofAlreadySubmitted(
           "Proof has already been submitted for this occurrence.",
         );
       }
 
-      throw error;
-    }
+      if (!recurring && existingProofs.length > 0) {
+        throw new ProofOneTimeAlreadyCompleted(
+          "This one-time commitment has already been completed.",
+        );
+      }
 
-    return { proof };
+      const proof = crypto.randomUUID();
+
+      try {
+        await this.proofs.insertOne({
+          _id: proof,
+          submitter,
+          goal,
+          commitment,
+          occurrence,
+          evidence: uniqueEvidence,
+          createdAt: new Date(),
+          ...(!recurring ? { singleUse: true } : {}),
+        });
+      } catch (error) {
+        if (
+          error instanceof MongoServerError &&
+          error.code === 11000
+        ) {
+          const duplicateOccurrence =
+            await this.proofs.findOne({
+              commitment,
+              occurrence,
+            });
+
+          if (duplicateOccurrence || recurring) {
+            throw new ProofAlreadySubmitted(
+              "Proof has already been submitted for this occurrence.",
+            );
+          }
+
+          throw new ProofOneTimeAlreadyCompleted(
+            "This one-time commitment has already been completed.",
+          );
+        }
+
+        throw error;
+      }
+
+      return { proof };
+    });
+  }
+
+  async resubmitProof({
+    submitter,
+    previousProof,
+    evidence,
+  }: {
+    submitter: User;
+    previousProof: string;
+    evidence: EvidenceBundle<Evidence>;
+  }) {
+    return withMutationLock(this.db, async () => {
+      await this.#ready();
+
+      const previous =
+        await this.#findProof(previousProof);
+
+      if (!previous) {
+        throw new ProofNotFound(
+          "There is no such proof.",
+        );
+      }
+
+      if (previous.submitter !== submitter) {
+        throw new NotProofAuthor(
+          "Only the submitter can resubmit this proof.",
+        );
+      }
+
+      const newerAttempt =
+        await this.attempts.findOne({
+          previousProof,
+        });
+
+      if (newerAttempt) {
+        throw new ProofSuperseded(
+          "This proof has a newer submission.",
+        );
+      }
+
+      const reviews = await this.verifications
+        .find({ proof: previousProof })
+        .toArray();
+
+      const disputed = reviews.some(
+        (review) => review.decision === "disputed",
+      );
+
+      const verified = reviews.some(
+        (review) => review.decision === "verified",
+      );
+
+      if (!disputed || verified) {
+        throw new ProofNotDisputed(
+          "Only a disputed proof without verified reviews can be resubmitted.",
+        );
+      }
+
+      const uniqueEvidence = [...new Set(evidence)];
+
+      if (uniqueEvidence.length === 0) {
+        throw new EvidenceRequired(
+          "At least one piece of evidence is required.",
+        );
+      }
+
+      const proof = crypto.randomUUID();
+
+      try {
+        await this.attempts.insertOne({
+          _id: proof,
+          submitter: previous.submitter,
+          goal: previous.goal,
+          commitment: previous.commitment,
+          occurrence: previous.occurrence,
+          evidence: uniqueEvidence,
+          previousProof,
+          attempt: (previous.attempt ?? 1) + 1,
+          createdAt: new Date(
+            Math.max(
+              Date.now(),
+              previous.createdAt.getTime() + 1,
+            ),
+          ),
+        });
+      } catch (error) {
+        if (
+          error instanceof MongoServerError &&
+          error.code === 11000
+        ) {
+          throw new ProofSuperseded(
+            "This proof has a newer submission.",
+          );
+        }
+
+        throw error;
+      }
+
+      return { proof };
+    });
   }
 
   async reviewProof({
@@ -195,53 +376,59 @@ export class ProofVerifyingConcept<
     decision: VerificationDecision;
     note: string;
   }) {
-    return withProofLock(
-      this.proofOperations,
-      proof,
-      async () => {
-        await ensureReady(this.proofs, this.verifications);
+    return withMutationLock(this.db, async () => {
+      await this.#ready();
 
-        const existingProof = await this.proofs.findOne({
-          _id: proof,
+      const existingProof =
+        await this.#findProof(proof);
+
+      if (!existingProof) {
+        throw new ProofNotFound(
+          "There is no such proof.",
+        );
+      }
+
+      if (existingProof.submitter === reviewer) {
+        throw new CannotReviewOwnProof(
+          "A user cannot review their own proof.",
+        );
+      }
+
+      const newerAttempt =
+        await this.attempts.findOne({
+          previousProof: proof,
         });
 
-        if (!existingProof) {
-          throw new ProofNotFound(
-            "There is no such proof.",
+      if (newerAttempt) {
+        throw new ProofSuperseded(
+          "This proof has a newer submission.",
+        );
+      }
+
+      try {
+        await this.verifications.insertOne({
+          _id: crypto.randomUUID(),
+          proof,
+          reviewer,
+          decision,
+          note,
+          createdAt: new Date(),
+        });
+      } catch (error) {
+        if (
+          error instanceof MongoServerError &&
+          error.code === 11000
+        ) {
+          throw new ProofAlreadyReviewed(
+            "This user has already reviewed this proof.",
           );
         }
 
-        if (existingProof.submitter === reviewer) {
-          throw new CannotReviewOwnProof(
-            "A user cannot review their own proof.",
-          );
-        }
+        throw error;
+      }
 
-        try {
-          await this.verifications.insertOne({
-            _id: crypto.randomUUID(),
-            proof,
-            reviewer,
-            decision,
-            note,
-            createdAt: new Date(),
-          });
-        } catch (error) {
-          if (
-            error instanceof MongoServerError &&
-            error.code === 11000
-          ) {
-            throw new ProofAlreadyReviewed(
-              "This user has already reviewed this proof.",
-            );
-          }
-
-          throw error;
-        }
-
-        return { proof };
-      },
-    );
+      return { proof };
+    });
   }
 
   async deletePendingProof({
@@ -251,63 +438,98 @@ export class ProofVerifyingConcept<
     submitter: User;
     proof: string;
   }) {
-    return withProofLock(
-      this.proofOperations,
-      proof,
-      async () => {
-        await ensureReady(this.proofs, this.verifications);
+    return withMutationLock(this.db, async () => {
+      await this.#ready();
 
-        const existingProof = await this.proofs.findOne({
-          _id: proof,
-        });
+      const existingProof =
+        await this.#findProof(proof);
 
-        if (!existingProof) {
-          throw new ProofNotFound(
-            "There is no such proof.",
-          );
-        }
+      if (!existingProof) {
+        throw new ProofNotFound(
+          "There is no such proof.",
+        );
+      }
 
-        if (existingProof.submitter !== submitter) {
-          throw new NotProofSubmitter(
-            "Only the submitter can delete this proof.",
-          );
-        }
+      if (existingProof.submitter !== submitter) {
+        throw new NotProofSubmitter(
+          "Only the submitter can delete this proof.",
+        );
+      }
 
-        const review = await this.verifications.findOne({
+      const review =
+        await this.verifications.findOne({
           proof,
         });
 
-        if (review) {
-          throw new ProofHasReviews(
-            "A proof with peer reviews cannot be deleted.",
-          );
-        }
+      if (review) {
+        throw new ProofHasReviews(
+          "A proof with peer reviews cannot be deleted.",
+        );
+      }
 
-        await this.proofs.deleteOne({
-          _id: proof,
+      const newerAttempt =
+        await this.attempts.findOne({
+          previousProof: proof,
         });
 
-        return { proof };
-      },
-    );
+      if (newerAttempt) {
+        throw new ProofSuperseded(
+          "This proof has a newer submission.",
+        );
+      }
+
+      await this.proofs.deleteOne({
+        _id: proof,
+      });
+
+      await this.attempts.deleteOne({
+        _id: proof,
+      });
+
+      return { proof };
+    });
   }
 
-  async _proof({ proof }: { proof: string }) {
-    const found = await this.proofs.findOne({
-      _id: proof,
-    });
+  async _proof({
+    proof,
+  }: {
+    proof: string;
+  }) {
+    const found = await this.#findProof(proof);
 
-    if (!found) return [];
+    if (!found) {
+      return [];
+    }
 
-    return [
-      {
-        submitter: found.submitter,
-        goal: found.goal,
-        commitment: found.commitment,
-        occurrence: found.occurrence,
-        evidence: found.evidence,
-      },
-    ];
+    return [{
+      submitter: found.submitter,
+      goal: found.goal,
+      commitment: found.commitment,
+      occurrence: found.occurrence,
+      evidence: found.evidence,
+    }];
+  }
+
+  async _proofAttempt({
+    proof,
+  }: {
+    proof: string;
+  }) {
+    const found = await this.#findProof(proof);
+
+    if (!found) {
+      return [];
+    }
+
+    const newerAttempt =
+      await this.attempts.findOne({
+        previousProof: proof,
+      });
+
+    return [{
+      attempt: found.attempt ?? 1,
+      current: newerAttempt === null,
+    }];
   }
 
   async _proofForOccurrence({
@@ -317,21 +539,38 @@ export class ProofVerifyingConcept<
     commitment: Commitment;
     occurrence: Date;
   }) {
-    const found = await this.proofs.findOne({
-      commitment,
-      occurrence,
-    });
+    const rows =
+      await this.#proofRows(commitment);
 
-    if (!found) return [];
+    const matching = rows.filter(
+      (proof) =>
+        proof.occurrence.getTime() ===
+        occurrence.getTime(),
+    );
 
-    return [
-      {
-        proof: found._id,
-        submitter: found.submitter,
-        goal: found.goal,
-        evidence: found.evidence,
-      },
-    ];
+    const replacedProofs = new Set(
+      matching
+        .map((proof) => proof.previousProof)
+        .filter(
+          (proof): proof is string =>
+            proof !== undefined,
+        ),
+    );
+
+    const current = matching.find(
+      (proof) => !replacedProofs.has(proof._id),
+    );
+
+    if (!current) {
+      return [];
+    }
+
+    return [{
+      proof: current._id,
+      submitter: current.submitter,
+      goal: current.goal,
+      evidence: current.evidence,
+    }];
   }
 
   async _proofsByCommitment({
@@ -339,10 +578,8 @@ export class ProofVerifyingConcept<
   }: {
     commitment: Commitment;
   }) {
-    const proofs = await this.proofs
-      .find({ commitment })
-      .sort({ createdAt: 1, _id: 1 })
-      .toArray();
+    const proofs =
+      await this.#proofRows(commitment);
 
     return proofs.map((proof) => ({
       proof: proof._id,
@@ -358,10 +595,11 @@ export class ProofVerifyingConcept<
   }: {
     proof: string;
   }) {
-    const verifications = await this.verifications
-      .find({ proof })
-      .sort({ createdAt: 1 })
-      .toArray();
+    const verifications =
+      await this.verifications
+        .find({ proof })
+        .sort({ createdAt: 1 })
+        .toArray();
 
     return verifications.map((verification) => ({
       reviewer: verification.reviewer,

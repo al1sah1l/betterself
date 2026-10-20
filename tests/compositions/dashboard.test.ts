@@ -9,15 +9,11 @@ import {
 import { assemble } from "@mit-sdg/sync-engine/assembly";
 
 import { applicationConceptSet } from "../../src/concepts.ts";
+
 import {
   ListMyGoals,
   MyGoals,
 } from "../../src/compositions/dashboard.ts";
-
-import {
-  openTestDb,
-  type TestDb,
-} from "../test-db.ts";
 
 import {
   GetGoalDetail,
@@ -36,6 +32,11 @@ import {
 } from "../../src/compositions/group-proofs.ts";
 
 import { ReviewProof } from "../../src/compositions/verification.ts";
+
+import {
+  openTestDb,
+  type TestDb,
+} from "../test-db.ts";
 
 let testDb: TestDb;
 
@@ -74,7 +75,7 @@ function assembleTestApplication() {
           ListGroupProofs,
         },
         verification: {
-            ReviewProof,
+          ReviewProof,
         },
       },
     },
@@ -131,6 +132,30 @@ async function createGoal(
   }
 
   return result.goal;
+}
+
+async function createGroup(
+  app: TestApplication,
+  owner: string,
+  name: string,
+) {
+  const result =
+    await app.concepts.AccountabilityGrouping.createGroup({
+      owner,
+      name,
+      topic: "Self-directed goals",
+    });
+
+  if (
+    typeof result !== "object" ||
+    result === null ||
+    !("group" in result) ||
+    typeof result.group !== "string"
+  ) {
+    throw new Error("Could not create group.");
+  }
+
+  return result.group;
 }
 
 type GoalsResponse = {
@@ -430,30 +455,6 @@ test("goal detail includes saved strategy, attached group, completion claims, an
   });
 });
 
-async function createGroup(
-  app: TestApplication,
-  owner: string,
-  name: string,
-) {
-  const result =
-    await app.concepts.AccountabilityGrouping.createGroup({
-      owner,
-      name,
-      topic: "Self-directed goals",
-    });
-
-  if (
-    typeof result !== "object" ||
-    result === null ||
-    !("group" in result) ||
-    typeof result.group !== "string"
-  ) {
-    throw new Error("Could not create group.");
-  }
-
-  return result.group;
-}
-
 test("my groups includes owned and joined groups but excludes other groups", async () => {
   const app = assembleTestApplication();
 
@@ -710,6 +711,16 @@ test("group proofs includes evidence and updates after peer review", async () =>
     commitment,
     occurrence,
     evidence,
+    outcome: "Get a software engineering internship",
+    successDefinition: "Receive and accept an internship offer.",
+    description: "Apply to five internships",
+    recurring: true,
+    schedule: "Every Monday",
+    sourceStep: null,
+    strategy: [],
+    strategyRevision: "initial",
+    attempt: 1,
+    current: true,
   };
 
   const before = await app.invoker.invoke(
@@ -867,6 +878,8 @@ test("goal owner sees proof and peer review without a completion claim", async (
               proof,
               occurrence,
               evidence,
+              attempt: 1,
+              current: true,
               verifications: [
                 {
                   reviewer: "alex",

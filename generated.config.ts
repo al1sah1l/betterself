@@ -23,6 +23,8 @@ export default {
       new URL("./design/compositions/plan-management.md", import.meta.url),
       new URL("./design/compositions/strategy-state.md", import.meta.url),
       new URL("./design/compositions/progress-review.md", import.meta.url),
+      new URL("./design/compositions/group-management.md", import.meta.url),
+      new URL("./design/compositions/proof-resubmission.md", import.meta.url),
     ],
   },
 };

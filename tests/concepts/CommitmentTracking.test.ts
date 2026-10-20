@@ -415,3 +415,125 @@ test("only one simultaneous completion succeeds for a one-time commitment", asyn
   expect(succeeded).toHaveLength(1);
   expect(failed).toHaveLength(1);
 });
+
+test("checkProofSubmission allows recurring commitments without changing completions", async () => {
+  const { commitment } = await commitments.createCommitment({
+    goal: "goal-1",
+    description: "Practice coding daily",
+    recurring: true,
+    schedule: "Every day",
+  });
+
+  const occurrence = new Date("2026-10-20T12:00:00Z");
+
+  const result = await commitments.checkProofSubmission({
+    commitment,
+    occurrence,
+  });
+
+  expect(result).toEqual({
+    commitment,
+    recurring: true,
+  });
+
+  expect(
+    await commitments._completionsByCommitment({ commitment }),
+  ).toHaveLength(0);
+});
+
+test("checkProofSubmission allows a new one-time commitment", async () => {
+  const { commitment } = await commitments.createCommitment({
+    goal: "goal-1",
+    description: "Submit application",
+    recurring: false,
+    schedule: "2026-10-20",
+  });
+
+  const result = await commitments.checkProofSubmission({
+    commitment,
+    occurrence: new Date("2026-10-20T12:00:00Z"),
+  });
+
+  expect(result).toEqual({
+    commitment,
+    recurring: false,
+  });
+
+  expect(
+    await commitments._completionsByCommitment({ commitment }),
+  ).toHaveLength(0);
+});
+
+test("checkProofSubmission allows the same one-time occurrence but rejects another", async () => {
+  const { commitment } = await commitments.createCommitment({
+    goal: "goal-1",
+    description: "Submit application",
+    recurring: false,
+    schedule: "2026-10-20",
+  });
+
+  const occurrence = new Date("2026-10-20T12:00:00Z");
+
+  await commitments.claimComplete({
+    commitment,
+    occurrence,
+  });
+
+  expect(
+    await commitments.checkProofSubmission({
+      commitment,
+      occurrence,
+    }),
+  ).toEqual({
+    commitment,
+    recurring: false,
+  });
+
+  await expect(
+    commitments.checkProofSubmission({
+      commitment,
+      occurrence: new Date("2026-10-21T12:00:00Z"),
+    }),
+  ).rejects.toThrow(
+    "This one-time commitment has already been completed.",
+  );
+
+  const completions =
+    await commitments._completionsByCommitment({ commitment });
+
+  expect(completions).toHaveLength(1);
+  expect(completions[0]?.occurrence).toEqual(occurrence);
+});
+
+test("checkProofSubmission rejects retired commitments", async () => {
+  const { commitment } = await commitments.createCommitment({
+    goal: "goal-1",
+    description: "Practice coding",
+    recurring: true,
+    schedule: "Every day",
+  });
+
+  await commitments.retireCommitment({ commitment });
+
+  await expect(
+    commitments.checkProofSubmission({
+      commitment,
+      occurrence: new Date("2026-10-20T12:00:00Z"),
+    }),
+  ).rejects.toThrow(
+    "This commitment is no longer active.",
+  );
+
+  expect(
+    await commitments._completionsByCommitment({ commitment }),
+  ).toHaveLength(0);
+});
+
+test("checkProofSubmission rejects nonexistent commitments", async () => {
+  await expect(
+    commitments.checkProofSubmission({
+      commitment: "nonexistent-commitment",
+      occurrence: new Date("2026-10-20T12:00:00Z"),
+    }),
+  ).rejects.toThrow("There is no such commitment.");
+});

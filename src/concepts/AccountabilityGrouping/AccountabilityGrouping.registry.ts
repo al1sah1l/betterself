@@ -1,7 +1,9 @@
 import { registerConcept } from "@mit-sdg/sync-engine/assembly";
 import type { Db } from "mongodb";
 
-import spec from "@design/concepts/AccountabilityGrouping.md" with { type: "text" };
+import spec from "@design/concepts/AccountabilityGrouping.md" with {
+  type: "text",
+};
 
 import {
   AccountabilityGroupingConcept,
@@ -11,6 +13,8 @@ import {
   GoalAlreadyAttached,
   GoalNotAttached,
   ProofAlreadyShared,
+  NotGroupOwner,
+  InvalidGroupDetails,
 } from "./AccountabilityGrouping.ts";
 
 export const accountabilityGrouping = registerConcept({
@@ -24,6 +28,8 @@ export const accountabilityGrouping = registerConcept({
     GOAL_ALREADY_ATTACHED: GoalAlreadyAttached,
     GOAL_NOT_ATTACHED: GoalNotAttached,
     PROOF_ALREADY_SHARED: ProofAlreadyShared,
+    NOT_GROUP_OWNER: NotGroupOwner,
+    INVALID_GROUP_DETAILS: InvalidGroupDetails,
   },
 
   floors: {

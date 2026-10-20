@@ -565,3 +565,253 @@ test("a missing group has no shared proofs", async () => {
 
   expect(rows).toEqual([]);
 });
+
+test("new groups are private by default and expose their owner", async () => {
+  const { group } = await createGroup();
+
+  expect(await groups._groupSettings({ group })).toEqual([
+    {
+      owner: "maya",
+      name: "Recruiting Buddies",
+      topic: "Software engineering recruiting",
+      visibility: "private",
+    },
+  ]);
+
+  expect(
+    await groups._publicGroups({ search: "" }),
+  ).toEqual([]);
+});
+
+test("public search matches names and topics and excludes private groups", async () => {
+  const career = await groups.createGroup({
+    owner: "maya",
+    name: "Career Circle",
+    topic: "Interview preparation",
+    visibility: "public",
+  });
+
+  const reading = await groups.createGroup({
+    owner: "alex",
+    name: "Readers",
+    topic: "Career books",
+    visibility: "public",
+  });
+
+  await groups.createGroup({
+    owner: "sam",
+    name: "Private Career Circle",
+    topic: "Career",
+    visibility: "private",
+  });
+
+  const found = await groups._publicGroups({
+    search: " CAREER ",
+  });
+
+  expect(found.map((item) => item.group).sort()).toEqual(
+    [career.group, reading.group].sort(),
+  );
+
+  expect(
+    await groups._publicGroups({ search: "no match" }),
+  ).toEqual([]);
+
+  expect(
+    await groups._publicGroups({ search: ".*" }),
+  ).toEqual([]);
+});
+
+test("owner can rename a group and change its visibility", async () => {
+  const { group } = await createGroup();
+
+  await groups.updateGroup({
+    group,
+    owner: "maya",
+    name: " New name ",
+    topic: " New topic ",
+    visibility: "public",
+  });
+
+  expect(await groups._groupSettings({ group })).toEqual([
+    {
+      owner: "maya",
+      name: "New name",
+      topic: "New topic",
+      visibility: "public",
+    },
+  ]);
+
+  expect(
+    await groups._publicGroups({ search: "New name" }),
+  ).toHaveLength(1);
+
+  await groups.updateGroup({
+    group,
+    owner: "maya",
+    name: "New name",
+    topic: "New topic",
+    visibility: "private",
+  });
+
+  expect(
+    await groups._publicGroups({ search: "New name" }),
+  ).toEqual([]);
+});
+
+test("a member cannot update or delete another user's group", async () => {
+  const { group } = await createGroup();
+
+  await groups.joinGroup({ group, user: "alex" });
+
+  const before = await groups._groupSettings({ group });
+
+  await expect(
+    groups.updateGroup({
+      group,
+      owner: "alex",
+      name: "Changed",
+      topic: "Changed",
+      visibility: "public",
+    }),
+  ).rejects.toThrow(
+    "Only the group owner can change or delete this group.",
+  );
+
+  await expect(
+    groups.deleteGroup({
+      group,
+      owner: "alex",
+    }),
+  ).rejects.toThrow(
+    "Only the group owner can change or delete this group.",
+  );
+
+  expect(await groups._groupSettings({ group })).toEqual(before);
+
+  expect(
+    (await groups._members({ group })).map((item) => item.user),
+  ).toEqual(["maya", "alex"]);
+});
+
+test("invalid group details do not create or change a group", async () => {
+  await expect(
+    groups.createGroup({
+      owner: "maya",
+      name: " ",
+      topic: "Career",
+      visibility: "public",
+    }),
+  ).rejects.toThrow("Enter a name of 1–100 characters");
+
+  expect(
+    await groups._groupsForUser({ user: "maya" }),
+  ).toEqual([]);
+
+  const { group } = await createGroup();
+  const before = await groups._groupSettings({ group });
+
+  await expect(
+    groups.updateGroup({
+      group,
+      owner: "maya",
+      name: "Valid name",
+      topic: "Career",
+      visibility: "invalid",
+    }),
+  ).rejects.toThrow("Enter a name of 1–100 characters");
+
+  expect(await groups._groupSettings({ group })).toEqual(before);
+});
+
+test("owner deletion removes group relationships and allows goal reattachment", async () => {
+  const { group } = await createGroup();
+
+  await groups.joinGroup({ group, user: "alex" });
+  await groups.attachGoal({
+    group,
+    user: "maya",
+    goal: "goal-1",
+  });
+  await groups.shareProof({
+    goal: "goal-1",
+    proof: "proof-1",
+  });
+
+  await groups.deleteGroup({ group, owner: "maya" });
+
+  expect(await groups._group({ group })).toEqual([]);
+  expect(await groups._groupSettings({ group })).toEqual([]);
+  expect(await groups._members({ group })).toEqual([]);
+  expect(await groups._sharedProofs({ group })).toEqual([]);
+  expect(
+    await groups._groupForGoal({ goal: "goal-1" }),
+  ).toEqual([]);
+  expect(
+    await groups._groupsForUser({ user: "alex" }),
+  ).toEqual([]);
+
+  await expect(
+    groups.joinGroup({ group, user: "alex" }),
+  ).rejects.toThrow("There is no such group.");
+
+  const replacement = await createGroup({
+    name: "Replacement group",
+  });
+
+  await groups.attachGoal({
+    group: replacement.group,
+    user: "maya",
+    goal: "goal-1",
+  });
+
+  expect(
+    await groups._groupForGoal({ goal: "goal-1" }),
+  ).toEqual([{ group: replacement.group }]);
+
+  await expect(
+    groups.deleteGroup({ group, owner: "maya" }),
+  ).rejects.toThrow("There is no such group.");
+});
+
+test("missing groups cannot be updated", async () => {
+  await expect(
+    groups.updateGroup({
+      group: "missing",
+      owner: "maya",
+      name: "Name",
+      topic: "Topic",
+      visibility: "private",
+    }),
+  ).rejects.toThrow("There is no such group.");
+});
+
+test("private groups can be joined using a shared group ID", async () => {
+  const { group } = await createGroup();
+
+  await groups.joinGroup({ group, user: "alex" });
+
+  expect(
+    (await groups._members({ group })).map((item) => item.user),
+  ).toContain("alex");
+
+  expect(
+    await groups._publicGroups({ search: "" }),
+  ).toEqual([]);
+});
+
+test("concurrent joining and deletion leave no membership behind", async () => {
+  const { group } = await createGroup();
+
+  const outcomes = await Promise.allSettled([
+    groups.joinGroup({ group, user: "alex" }),
+    groups.deleteGroup({ group, owner: "maya" }),
+  ]);
+
+  expect(outcomes[1].status).toBe("fulfilled");
+  expect(await groups._group({ group })).toEqual([]);
+  expect(await groups._members({ group })).toEqual([]);
+  expect(
+    await groups._groupsForUser({ user: "alex" }),
+  ).toEqual([]);
+});
