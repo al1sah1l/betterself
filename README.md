@@ -58,8 +58,8 @@ The Beta supports text and URL evidence, not uploaded files or images. Group cha
 - [Updated user journey](#updated-user-journey) — documented above.
 - [Saved automated test output](test-results/p3-tests.txt) — 205 passing tests, 0 failures in the final local run reported for P3.
 - [Visual Design Study — Typography & Color](docs/BetterSelf_Visual_Design_Study_Beta_UI_Updated.pdf).
-- **Narrated Beta demo (YouTube, up to 2 minutes):** TODO — insert video URL after upload.
-- **Deployed Beta app:** TODO — insert verified `https://<name>.mit-sdg.dev` URL after redeployment.
+- **Narrated Beta demo (YouTube, up to 2 minutes):** https://drive.google.com/file/d/1B2yCBv189ynPdFAyojnRX8xBB8lIsn21/view?usp=sharing
+- **Deployed Beta app:** https://betterself.mit-sdg.dev/
 - [P1 design submission](docs/design.md).
 - [Design notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md) — maintained in the private individual repository; accessible to authorized course staff.
 
