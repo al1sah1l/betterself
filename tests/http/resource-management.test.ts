@@ -1,4 +1,3 @@
-
 import {
   afterAll,
   beforeAll,
@@ -15,6 +14,15 @@ import {
   openTestDb,
   type TestDb,
 } from "../test-db.ts";
+
+import {
+  GridFSBucket,
+  ObjectId,
+} from "mongodb";
+
+import {
+  cleanupPendingGoalImages,
+} from "../../src/http/resource-management.ts";
 
 let testDb: TestDb;
 
@@ -690,5 +698,288 @@ test(
         commitment: "commitment-alex",
       }),
     ).toBe(1);
+  },
+);
+
+
+/* ------------------------------------------
+   GridFS cleanup
+------------------------------------------ */
+
+async function storeTestImage(): Promise<{
+  id: ObjectId;
+  token: string;
+}> {
+  const id = new ObjectId();
+
+  const bucket = new GridFSBucket(
+    testDb.db,
+    { bucketName: "proofImages" },
+  );
+
+  const bytes = Buffer.from([
+    137, 80, 78, 71, 13, 10, 26, 10,
+    0, 0, 0, 0,
+  ]);
+
+  const stream = bucket.openUploadStreamWithId(
+    id,
+    "proof.png",
+    {
+      metadata: {
+        owner: "maya",
+        contentType: "image/png",
+      },
+    },
+  );
+
+  await new Promise<void>((resolve, reject) => {
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+    stream.end(bytes);
+  });
+
+  await testDb.db
+    .collection("proofImageOwners")
+    .insertOne({
+      _id: id,
+      owner: "maya",
+      contentType: "image/png",
+    });
+
+  return {
+    id,
+    token: `image:${id.toHexString()}`,
+  };
+}
+
+test(
+  "deleting a goal removes its GridFS image",
+  async () => {
+    await addGoal("goal-image", "maya");
+    await addCommitment(
+      "commitment-image",
+      "goal-image",
+    );
+
+    const image = await storeTestImage();
+
+    await testDb.db
+      .collection<StringIdDocument>(collections.proofs)
+      .insertOne({
+        _id: "proof-image",
+        goal: "goal-image",
+        commitment: "commitment-image",
+        submitter: "maya",
+        occurrence: new Date(),
+        evidence: [image.token],
+        createdAt: new Date(),
+      });
+
+    const response = await request(
+      "goals/delete",
+      "maya-session",
+      { goal: "goal-image" },
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(
+      await count("proofImages.files", {
+        _id: image.id,
+      }),
+    ).toBe(0);
+
+    expect(
+      await count("proofImageOwners", {
+        _id: image.id,
+      }),
+    ).toBe(0);
+
+    expect(
+      await count("maintenance.imageCleanup", {
+        imageId: image.id,
+      }),
+    ).toBe(0);
+  },
+);
+
+test(
+  "deleting a goal removes images from previous attempts",
+  async () => {
+    await addGoal("goal-retry", "maya");
+    await addCommitment(
+      "commitment-retry",
+      "goal-retry",
+    );
+
+    const first = await storeTestImage();
+    const second = await storeTestImage();
+
+    await testDb.db
+      .collection<StringIdDocument>(collections.proofs)
+      .insertOne({
+        _id: "proof-first",
+        goal: "goal-retry",
+        commitment: "commitment-retry",
+        submitter: "maya",
+        occurrence: new Date(),
+        evidence: [first.token],
+        createdAt: new Date(),
+      });
+
+    await testDb.db
+      .collection<StringIdDocument>(collections.attempts)
+      .insertOne({
+        _id: "proof-second",
+        previousProof: "proof-first",
+        goal: "goal-retry",
+        commitment: "commitment-retry",
+        submitter: "maya",
+        occurrence: new Date(),
+        evidence: [second.token],
+        createdAt: new Date(),
+      });
+
+    const response = await request(
+      "goals/delete",
+      "maya-session",
+      { goal: "goal-retry" },
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(
+      await count("proofImages.files", {
+        _id: { $in: [first.id, second.id] },
+      }),
+    ).toBe(0);
+
+    expect(
+      await count("proofImageOwners", {
+        _id: { $in: [first.id, second.id] },
+      }),
+    ).toBe(0);
+  },
+);
+
+test(
+  "an image still referenced by another goal is preserved",
+  async () => {
+    await addGoal("goal-delete", "maya");
+    await addGoal("goal-keep", "maya");
+
+    const image = await storeTestImage();
+
+    for (const [proof, goal] of [
+      ["proof-delete", "goal-delete"],
+      ["proof-keep", "goal-keep"],
+    ]) {
+      await testDb.db
+        .collection<StringIdDocument>(collections.proofs)
+        .insertOne({
+          _id: proof,
+          goal,
+          commitment: `commitment-${goal}`,
+          submitter: "maya",
+          occurrence: new Date(),
+          evidence: [image.token],
+          createdAt: new Date(),
+        });
+    }
+
+    const response = await request(
+      "goals/delete",
+      "maya-session",
+      { goal: "goal-delete" },
+    );
+
+    expect(response.status).toBe(200);
+
+    expect(
+      await count("proofImages.files", {
+        _id: image.id,
+      }),
+    ).toBe(1);
+
+    expect(
+      await count("proofImageOwners", {
+        _id: image.id,
+      }),
+    ).toBe(1);
+
+    expect(
+      await count(collections.proofs, {
+        _id: "proof-keep",
+      }),
+    ).toBe(1);
+  },
+);
+
+
+test(
+  "startup recovery completes an interrupted GridFS cleanup",
+  async () => {
+    // Simulate an image originally uploaded by Maya.
+    const image = await storeTestImage();
+
+    // The goal's proof has already been deleted,
+    // but the durable cleanup job was left behind.
+    await testDb.db
+      .collection("maintenance.imageCleanup")
+      .insertOne({
+        imageId: image.id,
+        createdAt: new Date(),
+      });
+
+    expect(
+      await count("proofImages.files", {
+        _id: image.id,
+      }),
+    ).toBe(1);
+
+    expect(
+      await count("maintenance.imageCleanup", {
+        imageId: image.id,
+      }),
+    ).toBe(1);
+
+    // Run the same recovery function used by main.ts.
+    const recovery =
+      await cleanupPendingGoalImages(testDb.db);
+
+    expect(recovery.removed).toBe(1);
+    expect(recovery.pending).toBe(0);
+
+    expect(
+      await count("proofImages.files", {
+        _id: image.id,
+      }),
+    ).toBe(0);
+
+    expect(
+      await count("proofImages.chunks", {
+        files_id: image.id,
+      }),
+    ).toBe(0);
+
+    expect(
+      await count("proofImageOwners", {
+        _id: image.id,
+      }),
+    ).toBe(0);
+
+    expect(
+      await count("maintenance.imageCleanup", {
+        imageId: image.id,
+      }),
+    ).toBe(0);
+
+    // Recovery is safe to run again.
+    const secondRecovery =
+      await cleanupPendingGoalImages(testDb.db);
+
+    expect(secondRecovery.removed).toBe(0);
+    expect(secondRecovery.pending).toBe(0);
   },
 );

@@ -6,11 +6,16 @@ import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
 import { assembleApplication } from "./assembly.ts";
 import { db } from "./db.ts";
 import { serveFrontend } from "./http/frontend.ts";
+
 import {
   handleImageRequest,
   imageEvidenceIsOwned,
 } from "./http/images.ts";
-import { handleResourceManagementRequest } from "./http/resource-management.ts";
+
+import {
+  cleanupPendingGoalImages,
+  handleResourceManagementRequest,
+} from "./http/resource-management.ts";
 
 const application = assembleApplication();
 
@@ -169,8 +174,44 @@ const handler = createHttpHandler({
   }),
 });
 
+/**
+ * Recover durable GridFS cleanup jobs left by an
+ * earlier delete operation or interrupted shutdown.
+ *
+ * This processes one bounded batch per startup.
+ * Pending jobs are retained for another retry.
+ */
+async function recoverImageCleanup(): Promise<void> {
+  try {
+    await db.command(
+      { ping: 1 },
+      { timeoutMS: 5000 },
+    );
+
+    const result =
+      await cleanupPendingGoalImages(db);
+
+    console.log(
+      `[startup] Image cleanup: ` +
+      `${result.removed} completed, ` +
+      `${result.pending} pending`,
+    );
+  } catch (error) {
+    console.error(
+      "[startup] Could not recover image cleanup:",
+      error,
+    );
+
+    // Startup is allowed to continue. Pending cleanup
+    // records are retained in MongoDB for another retry.
+  }
+}
+
+await recoverImageCleanup();
+
 const server = Bun.serve({
   hostname: process.env.HOST ?? "127.0.0.1",
+
   port: Number(
     process.env.PORT ?? 3000,
   ),
@@ -204,13 +245,12 @@ const server = Bun.serve({
     ) {
       return handleResourceManagementRequest(
         request,
-        (target, body) => invokeGateway(target, body),
+        (target, body) =>
+          invokeGateway(target, body),
       );
     }
 
-    if (
-      path.startsWith("/api/images/")
-    ) {
+    if (path.startsWith("/api/images/")) {
       return handleImageRequest(
         request,
         (target, body) =>
