@@ -10,6 +10,7 @@ import {
   handleImageRequest,
   imageEvidenceIsOwned,
 } from "./http/images.ts";
+import { handleResourceManagementRequest } from "./http/resource-management.ts";
 
 const application = assembleApplication();
 
@@ -195,6 +196,16 @@ const server = Bun.serve({
           { status: 503 },
         );
       }
+    }
+
+    if (
+      path === "/api/groups/leave" ||
+      path === "/api/goals/delete"
+    ) {
+      return handleResourceManagementRequest(
+        request,
+        (target, body) => invokeGateway(target, body),
+      );
     }
 
     if (

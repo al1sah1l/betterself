@@ -37,7 +37,9 @@ const parts = computed(() =>
 async function loadImage() {
   const id = ++generation;
 
-  imageDialog.value?.close();
+  if (imageDialog.value?.open) {
+    imageDialog.value.close();
+  }
 
   if (imageUrl.value) {
     URL.revokeObjectURL(imageUrl.value);
@@ -113,7 +115,9 @@ watch(
 onUnmounted(() => {
   generation++;
 
-  imageDialog.value?.close();
+  if (imageDialog.value?.open) {
+    imageDialog.value.close();
+  }
 
   if (imageUrl.value) {
     URL.revokeObjectURL(imageUrl.value);
@@ -154,7 +158,10 @@ onUnmounted(() => {
       {{ imageError }}
     </span>
 
-    <span v-else class="image-loading">
+    <span
+      v-else
+      class="image-loading"
+    >
       Loading image…
     </span>
 
@@ -339,8 +346,13 @@ a:hover {
   font-size: 13px;
 }
 
-/* Arrange multiple evidence items as wrapping tiles
-   in the existing Goal Detail and Group Proofs lists. */
+/*
+ * Evidence gallery layout:
+ * 1. Text evidence occupies full width.
+ * 2. Images appear below text, side by side.
+ * 3. Images wrap automatically on smaller screens.
+ */
+
 :global(.evidence-list) {
   display: flex;
   flex-wrap: wrap;
@@ -356,10 +368,39 @@ a:hover {
   overflow-wrap: anywhere;
 }
 
+/* Text always appears before images. */
+:global(.evidence-list > li:not(:has(.image-evidence))) {
+  flex: 0 0 100%;
+  order: 0;
+  margin-top: 0;
+}
+
+/* Multiple images share a single row when space permits. */
+:global(.evidence-list > li:has(.image-evidence)) {
+  flex: 0 0 auto;
+  order: 1;
+  margin-top: 0;
+}
+
+/* Keep image gallery visually separate from text. */
+:global(.evidence-list > li:has(.image-evidence):first-of-type) {
+  margin-top: 4px;
+}
+
 @media (max-width: 600px) {
   .image-thumbnail {
     width: 100px;
     height: 100px;
+  }
+
+  :global(.evidence-list) {
+    gap: 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .image-thumbnail img {
+    transition: none;
   }
 }
 </style>

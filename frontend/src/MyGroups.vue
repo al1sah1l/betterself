@@ -3,6 +3,7 @@ import { onMounted, ref } from "vue";
 import { api, ApiError } from "./api";
 import JoinGroup from "./JoinGroup.vue";
 import GroupProofs from "./GroupProofs.vue";
+import LeaveGroupButton from "./LeaveGroupButton.vue";
 
 const props = defineProps<{
   session: string;
@@ -494,6 +495,13 @@ onMounted(loadGroups);
         </header>
 
         <p class="group-id">Group ID: {{ group.group }}</p>
+        <LeaveGroupButton
+            v-if="group.owner !== props.account"
+            :session="props.session"
+            :group="group.group"
+            :name="group.name"
+            @left="loadGroups"
+        />
         <p v-if="group.visibility === 'private'" class="invitation-hint">
           Share this ID only with people you want to invite.
         </p>

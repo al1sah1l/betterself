@@ -1,0 +1,519 @@
+
+/*
+ * BetterSelf — Goal Workspace Theme
+ *
+ * Visual enhancements for existing goal components.
+ * No business logic or proof access control changes.
+ */
+
+.goal-workspace {
+  --workspace-purple: #7354c5;
+  --workspace-purple-dark: #6041b1;
+  --workspace-lavender: #f1ebfc;
+  --workspace-border: #e3dcee;
+  --workspace-shadow: 0 8px 28px rgba(67, 43, 116, 0.045);
+}
+
+/* Shared headings */
+
+.goal-workspace .content-section > .section-heading h3,
+.goal-workspace .results-heading h3,
+.goal-workspace .progress-review > h3 {
+  color: var(--text);
+  font-size: 23px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.goal-workspace .goal-heading h2 {
+  color: var(--text);
+  font-size: clamp(25px, 3.5vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.goal-workspace .goal-heading .eyebrow,
+.goal-workspace .results-heading .eyebrow {
+  color: var(--workspace-purple);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+/* Goal overview and context */
+
+.goal-workspace .goal-context {
+  gap: 20px;
+  padding: 25px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 18px;
+  background: white;
+  box-shadow: var(--workspace-shadow);
+}
+
+.goal-workspace .goal-context dt {
+  margin-bottom: 6px;
+  color: var(--workspace-purple);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+}
+
+.goal-workspace .goal-context dd {
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+/* Strategy */
+
+.goal-workspace .strategy-list {
+  gap: 11px;
+}
+
+.goal-workspace .strategy-list > li {
+  gap: 16px;
+  padding: 19px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 15px;
+  background: white;
+  box-shadow: var(--workspace-shadow);
+}
+
+.goal-workspace .step-number {
+  width: 39px;
+  height: 39px;
+  border-radius: 12px;
+  background: var(--workspace-lavender);
+  color: var(--workspace-purple);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.goal-workspace .step-content {
+  color: var(--text);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.goal-workspace .step-content .muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Group attachment */
+
+.goal-workspace .accountability-panel {
+  margin-top: 28px;
+  padding: 21px 24px;
+  border: 1px solid #dfd3f1;
+  border-left: 4px solid var(--workspace-purple);
+  border-radius: 15px;
+  background: #f6f1fe;
+}
+
+.goal-workspace .accountability-panel h3 {
+  color: #493075;
+  font-weight: 750;
+}
+
+/* Plan controls */
+
+.goal-workspace .plan-controls {
+  margin: 20px 0 25px;
+  padding: 18px 22px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 15px;
+  background: white;
+  box-shadow: var(--workspace-shadow);
+}
+
+.goal-workspace .plan-controls summary {
+  color: var(--workspace-purple);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.goal-workspace .plan-controls[open] {
+  border-color: #cbb7ec;
+}
+
+/* Commitments */
+
+.goal-workspace .commitment-list {
+  gap: 17px;
+}
+
+.goal-workspace .commitment-card {
+  padding: 25px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 19px;
+  background: white;
+  box-shadow: var(--workspace-shadow);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.goal-workspace .commitment-card:hover {
+  border-color: #cbb7eb;
+  box-shadow: 0 10px 28px rgba(67, 43, 116, 0.08);
+}
+
+.goal-workspace .commitment-card--retired {
+  background: #fbfaff;
+  border-style: dashed;
+}
+
+.goal-workspace .commitment-header h4 {
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.goal-workspace .commitment-meta {
+  margin-top: 13px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.goal-workspace .state-badge {
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #eee7fc;
+  color: #6041b1;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.goal-workspace .state-badge--retired {
+  background: #f0eef3;
+  color: #716a7c;
+}
+
+.goal-workspace .commitment-filters {
+  gap: 9px;
+}
+
+.goal-workspace .commitment-filters button {
+  padding: 9px 15px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 999px;
+  background: white;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.goal-workspace .commitment-filters button[aria-pressed="true"] {
+  border-color: var(--workspace-purple);
+  background: var(--workspace-purple);
+  color: white;
+}
+
+/* Proof cards */
+
+.goal-workspace .proofs-section {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.goal-workspace .proofs-section h5 {
+  margin-bottom: 17px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 750;
+}
+
+.goal-workspace .proof-count {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #f1eafd;
+  color: var(--workspace-purple);
+  font-weight: 750;
+}
+
+.goal-workspace .proof-list {
+  gap: 15px;
+}
+
+.goal-workspace .proof-card {
+  padding: 22px;
+  border: 1px solid #e3dcef;
+  border-radius: 17px;
+  background: #faf8ff;
+}
+
+.goal-workspace .attempt-label {
+  color: #706784;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.goal-workspace .proof-date {
+  margin-bottom: 17px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/*
+ * Keep the existing evidence gallery.
+ * Text remains on its own row above the image tiles.
+ */
+
+.goal-workspace .evidence-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.goal-workspace .evidence-list > li {
+  max-width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.goal-workspace
+  .evidence-list > li:not(:has(.image-evidence)) {
+  flex: 0 0 100%;
+  order: 0;
+  margin: 0;
+}
+
+.goal-workspace
+  .evidence-list > li:has(.image-evidence) {
+  flex: 0 0 auto;
+  order: 1;
+  margin: 0;
+}
+
+/* Review statuses — intentionally distinct */
+
+.goal-workspace .review-badge {
+  padding: 8px 13px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.goal-workspace .review-badge--verified {
+  background: #e9dffb;
+  color: #58349f;
+}
+
+.goal-workspace .review-badge--pending {
+  background: #e9e7ef;
+  color: #514b60;
+}
+
+.goal-workspace .review-badge--disputed {
+  background: #fce4e7;
+  color: #972438;
+}
+
+.goal-workspace .review-badge--mixed {
+  background: #fff0cc;
+  color: #77500b;
+}
+
+.goal-workspace .review-info {
+  border: 1px solid var(--workspace-border);
+  border-radius: 12px;
+  background: white;
+}
+
+.goal-workspace .delete-proof-button {
+  color: #a32939;
+}
+
+/* Proof submission and expandable panels */
+
+.goal-workspace .proof-submission {
+  margin-top: 24px;
+  padding-top: 17px;
+  border-top: 1px solid var(--workspace-border);
+}
+
+.goal-workspace .proof-submission > summary {
+  color: var(--workspace-purple);
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.goal-workspace .proof-submission[open] {
+  padding-bottom: 6px;
+}
+
+/* Results */
+
+.goal-workspace .observed-results {
+  margin-top: 23px;
+}
+
+.goal-workspace .results-heading {
+  margin-bottom: 24px;
+}
+
+.goal-workspace .record-panel {
+  padding: 26px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 19px;
+  background: white;
+  box-shadow: var(--workspace-shadow);
+}
+
+.goal-workspace .record-panel h4 {
+  color: var(--text);
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+
+.goal-workspace .history-heading {
+  margin-top: 38px;
+}
+
+.goal-workspace .history-heading h4 {
+  font-size: 19px;
+}
+
+.goal-workspace .result-count {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eee7fc;
+  color: var(--workspace-purple);
+}
+
+.goal-workspace .result-list {
+  gap: 14px;
+}
+
+.goal-workspace .result-card {
+  padding: 24px;
+  border: 1px solid var(--workspace-border);
+  border-left: 4px solid var(--workspace-purple);
+  border-radius: 16px;
+  background: white;
+  box-shadow: var(--workspace-shadow);
+}
+
+.goal-workspace .observation {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+/* AI Review */
+
+.goal-workspace .progress-review {
+  margin-top: 22px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.goal-workspace .progress-review > h3 {
+  margin-bottom: 15px;
+}
+
+.goal-workspace .progress-review .analysis {
+  padding: 22px;
+  border: 1px solid #dfd3f1;
+  border-radius: 16px;
+  background: #f6f1fe;
+  color: #352950;
+  line-height: 1.8;
+}
+
+.goal-workspace .progress-review .step {
+  margin-bottom: 11px;
+  padding: 19px;
+  border: 1px solid var(--workspace-border);
+  border-radius: 14px;
+  background: white;
+}
+
+/* Shared form controls */
+
+.goal-workspace input:not([type="checkbox"]):not([type="radio"]),
+.goal-workspace textarea,
+.goal-workspace select {
+  max-width: 100%;
+  border: 1px solid var(--workspace-border);
+  border-radius: 10px;
+  background: white;
+  color: var(--text);
+}
+
+.goal-workspace input:focus-visible,
+.goal-workspace textarea:focus-visible,
+.goal-workspace select:focus-visible,
+.goal-workspace button:focus-visible,
+.goal-workspace summary:focus-visible {
+  outline: 2px solid var(--workspace-purple);
+  outline-offset: 3px;
+}
+
+.goal-workspace .primary {
+  border-radius: 11px;
+  background: var(--workspace-purple);
+  font-weight: 750;
+}
+
+.goal-workspace .primary:hover:not(:disabled) {
+  background: var(--workspace-purple-dark);
+}
+
+.goal-workspace .text-button {
+  color: var(--workspace-purple);
+  font-weight: 650;
+}
+
+/* Existing dialogs */
+
+.goal-workspace .commitment-dialog {
+  border: 1px solid var(--workspace-border);
+  border-radius: 19px;
+  background: white;
+  box-shadow: 0 24px 80px rgba(29, 20, 50, 0.2);
+}
+
+/* Responsive */
+
+@media (max-width: 700px) {
+  .goal-workspace .goal-context {
+    grid-template-columns: 1fr;
+    gap: 18px;
+    padding: 19px;
+  }
+
+  .goal-workspace .commitment-card,
+  .goal-workspace .record-panel,
+  .goal-workspace .result-card {
+    padding: 18px;
+  }
+
+  .goal-workspace .proof-card {
+    padding: 16px;
+  }
+
+  .goal-workspace .strategy-list > li {
+    padding: 15px;
+  }
+
+  .goal-workspace .commitment-header {
+    flex-direction: column;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .goal-workspace .commitment-card {
+    transition: none;
+  }
+}

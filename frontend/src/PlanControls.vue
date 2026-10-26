@@ -1,6 +1,8 @@
+
 <script setup lang="ts">
 import { reactive, ref } from "vue";
 import { api, ApiError } from "./api";
+import DeleteGoalButton from "./DeleteGoalButton.vue";
 
 const props = defineProps<{
   session: string;
@@ -9,6 +11,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   saved: [];
+  deleted: [];
 }>();
 
 const fields = reactive({
@@ -107,11 +110,7 @@ function opened(event: Event) {
 }
 
 async function updateGoal() {
-  if (
-    saving.value ||
-    loading.value ||
-    !ready.value
-  ) {
+  if (saving.value || loading.value || !ready.value) {
     return;
   }
 
@@ -125,11 +124,7 @@ async function updateGoal() {
     ]),
   );
 
-  if (
-    Object.values(values).some(
-      (value) => !value,
-    )
-  ) {
+  if (Object.values(values).some((value) => !value)) {
     error.value = "Complete every goal field.";
     return;
   }
@@ -155,11 +150,7 @@ async function updateGoal() {
 }
 
 async function retire() {
-  if (
-    saving.value ||
-    loading.value ||
-    !selected.value
-  ) {
+  if (saving.value || loading.value || !selected.value) {
     return;
   }
 
@@ -211,108 +202,125 @@ async function retire() {
     @toggle="opened"
   >
     <summary>
-      Edit goal and manage commitments
+      ⚙ Goal settings — Edit goal and manage commitments
     </summary>
 
     <p v-if="loading" role="status">
-      Loading plan...
+      Loading settings...
     </p>
 
     <template v-if="ready">
-      <h3>Edit goal</h3>
+      <section class="settings-section">
+        <h3>Edit goal</h3>
 
-      <p class="muted">
-        Changing goal context keeps the current strategy.
-        You can review the strategy separately.
-      </p>
+        <p class="muted">
+          Update your goal context without replacing
+          your current strategy.
+        </p>
 
-      <form @submit.prevent="updateGoal">
-        <fieldset :disabled="saving || loading">
-          <template
-            v-for="item in labels"
-            :key="item.key"
-          >
-            <label
-              :for="`edit-${item.key}-${props.goal}`"
+        <form @submit.prevent="updateGoal">
+          <fieldset :disabled="saving || loading">
+            <template
+              v-for="item in labels"
+              :key="item.key"
             >
-              {{ item.label }}
+              <label
+                :for="`edit-${item.key}-${props.goal}`"
+              >
+                {{ item.label }}
+              </label>
+
+              <textarea
+                :id="`edit-${item.key}-${props.goal}`"
+                v-model="fields[item.key]"
+                rows="2"
+                required
+              />
+            </template>
+
+            <button class="primary" type="submit">
+              {{ saving ? "Saving..." : "Save goal" }}
+            </button>
+          </fieldset>
+        </form>
+      </section>
+
+      <section class="settings-section">
+        <h3>Manage commitments</h3>
+
+        <p class="muted">
+          Retire a commitment to stop future submissions
+          while preserving its completion and proof history.
+        </p>
+
+        <form
+          v-if="commitments.some((item) => item.active)"
+          @submit.prevent="retire"
+        >
+          <fieldset :disabled="saving || loading">
+            <label :for="`retire-${props.goal}`">
+              Active commitment
             </label>
 
-            <textarea
-              :id="`edit-${item.key}-${props.goal}`"
-              v-model="fields[item.key]"
-              rows="2"
+            <select
+              :id="`retire-${props.goal}`"
+              v-model="selected"
               required
-            />
-          </template>
-
-          <button
-            class="primary"
-            type="submit"
-          >
-            {{ saving ? "Saving..." : "Save goal" }}
-          </button>
-        </fieldset>
-      </form>
-
-      <h3>Retire a commitment</h3>
-
-      <p class="muted">
-        Stop future submissions while keeping completion
-        claims, proofs, and peer reviews.
-      </p>
-
-      <form
-        v-if="commitments.some((item) => item.active)"
-        @submit.prevent="retire"
-      >
-        <fieldset :disabled="saving || loading">
-          <label :for="`retire-${props.goal}`">
-            Active commitment
-          </label>
-
-          <select
-            :id="`retire-${props.goal}`"
-            v-model="selected"
-            required
-          >
-            <option disabled value="">
-              Choose a commitment
-            </option>
-
-            <template
-              v-for="item in commitments"
-              :key="item.commitment"
             >
-              <option
-                v-if="item.active"
-                :value="item.commitment"
-              >
-                {{ item.description }}
+              <option disabled value="">
+                Choose a commitment
               </option>
-            </template>
-          </select>
 
-          <button
-            class="primary"
-            type="submit"
-            :disabled="!selected"
-          >
-            Retire commitment
-          </button>
-        </fieldset>
-      </form>
+              <template
+                v-for="item in commitments"
+                :key="item.commitment"
+              >
+                <option
+                  v-if="item.active"
+                  :value="item.commitment"
+                >
+                  {{ item.description }}
+                </option>
+              </template>
+            </select>
 
-      <p v-else class="muted">
-        No active commitments.
-      </p>
+            <button
+              class="primary"
+              type="submit"
+              :disabled="!selected"
+            >
+              Retire commitment
+            </button>
+          </fieldset>
+        </form>
+
+        <p v-else class="muted">
+          No active commitments.
+        </p>
+      </section>
+
+      <section
+        class="danger-zone"
+        aria-labelledby="delete-goal-heading"
+      >
+        <h3 id="delete-goal-heading">Danger zone</h3>
+
+        <p>
+          Permanently delete this goal and its associated
+          commitments, proofs, reviews and recorded results.
+          This action cannot be undone.
+        </p>
+
+        <DeleteGoalButton
+          :session="props.session"
+          :goal="props.goal"
+          :outcome="fields.outcome"
+          @deleted="emit('deleted')"
+        />
+      </section>
     </template>
 
-    <p
-      v-if="error"
-      class="error"
-      role="alert"
-    >
+    <p v-if="error" class="error" role="alert">
       {{ error }}
     </p>
 
@@ -326,22 +334,54 @@ async function retire() {
       :disabled="saving || loading"
       @click="load"
     >
-      Reload plan
+      Reload settings
     </button>
   </details>
 </template>
 
 <style scoped>
 .plan-controls {
-  padding: 20px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
   margin-top: 24px;
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
 }
 
-summary {
+.plan-controls > summary {
+  color: var(--accent);
   cursor: pointer;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.plan-controls > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.settings-section {
+  padding: 24px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-section h3 {
+  margin: 0 0 9px;
+  font-size: 19px;
+}
+
+.settings-section > .muted {
+  margin-bottom: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+fieldset {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  border: 0;
+  padding: 0;
 }
 
 textarea,
@@ -349,7 +389,9 @@ select {
   width: 100%;
   padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 9px;
+  background: white;
+  color: var(--text);
   font: inherit;
 }
 
@@ -361,5 +403,36 @@ textarea:focus-visible,
 select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+.danger-zone {
+  margin: 27px 0 15px;
+  padding: 21px;
+  border: 1px solid #eebdc5;
+  border-radius: 14px;
+  background: #fff9fa;
+}
+
+.danger-zone h3 {
+  margin: 0 0 10px;
+  color: #a32939;
+  font-size: 18px;
+}
+
+.danger-zone p {
+  margin: 0 0 12px;
+  color: #765760;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+@media (max-width: 600px) {
+  .plan-controls {
+    padding: 16px;
+  }
+
+  .danger-zone {
+    padding: 16px;
+  }
 }
 </style>
