@@ -1,3 +1,4 @@
+
 <script setup lang="ts">
 import { nextTick, onMounted, ref, computed } from "vue";
 import { api, ApiError } from "./api";
@@ -11,6 +12,10 @@ import EvidenceText from "./EvidenceText.vue";
 const props = defineProps<{
   session: string;
   goal: string;
+}>();
+
+const emit = defineEmits<{
+  "open-settings": [];
 }>();
 
 type StrategyStep = {
@@ -342,24 +347,36 @@ onMounted(loadDetail);
         <h2>{{ detail.outcome }}</h2>
       </header>
 
-      <dl class="goal-context">
-        <div>
-          <dt>Starting point</dt>
-          <dd>{{ detail.currentContext }}</dd>
-        </div>
-        <div>
-          <dt>Constraints</dt>
-          <dd>{{ detail.constraints }}</dd>
-        </div>
-        <div>
-          <dt>Timeline</dt>
-          <dd>{{ detail.timeline }}</dd>
-        </div>
-        <div>
-          <dt>Success definition</dt>
-          <dd>{{ detail.successDefinition }}</dd>
-        </div>
-      </dl>
+      <div class="goal-context-shell">
+        <button
+          type="button"
+          class="goal-settings-trigger"
+          aria-label="Open goal settings"
+          title="Goal settings"
+          @click="emit('open-settings')"
+        >
+          ⋯
+        </button>
+
+        <dl class="goal-context">
+          <div>
+            <dt>Starting point</dt>
+            <dd>{{ detail.currentContext }}</dd>
+          </div>
+          <div>
+            <dt>Constraints</dt>
+            <dd>{{ detail.constraints }}</dd>
+          </div>
+          <div>
+            <dt>Timeline</dt>
+            <dd>{{ detail.timeline }}</dd>
+          </div>
+          <div>
+            <dt>Success definition</dt>
+            <dd>{{ detail.successDefinition }}</dd>
+          </div>
+        </dl>
+      </div>
 
       <section class="content-section" aria-label="Strategy">
         <header class="section-heading">
@@ -455,7 +472,11 @@ onMounted(loadDetail);
           {{ deleteSuccess }}
         </p>
 
-        <div class="commitment-filters" role="group" aria-label="Filter commitments">
+        <div
+          class="commitment-filters"
+          role="group"
+          aria-label="Filter commitments"
+        >
           <button
             type="button"
             :aria-pressed="commitmentFilter === 'all'"
@@ -581,6 +602,7 @@ onMounted(loadDetail);
                         : "Delete pending proof"
                     }}
                   </button>
+
                   <ResubmitProof
                     v-if="commitment.active && canResubmit(proof)"
                     :session="props.session"
@@ -1142,4 +1164,39 @@ dd {
   font-weight: 650;
 }
 
+.goal-context-shell {
+  position: relative;
+}
+
+.goal-settings-trigger {
+  position: absolute;
+  z-index: 2;
+  top: 15px;
+  right: 17px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 36px;
+  border: 1px solid #e3d9f2;
+  border-radius: 10px;
+  background: #f6f1ff;
+  color: #7354c5;
+  font-size: 27px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.goal-settings-trigger:hover {
+  background: #e9ddfb;
+}
+
+.goal-settings-trigger:focus-visible {
+  outline: 2px solid #7354c5;
+  outline-offset: 3px;
+}
+
+.goal-context-shell .goal-context {
+  padding-top: 61px;
+}
 </style>

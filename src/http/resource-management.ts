@@ -2,15 +2,11 @@
 import {
   GridFSBucket,
   ObjectId,
-  type ClientSession,
   type Db,
 } from "mongodb";
 
 import { db as appDb } from "../db.ts";
-
-import {
-  withGoalLock,
-} from "./goal-operation-lock.ts";
+import { withGoalLock } from "./goal-operation-lock.ts";
 
 type Invoker = (
   path: string,
@@ -32,6 +28,7 @@ type Group = {
 type Goal = {
   _id: string;
   owner: string;
+  deleting?: boolean;
 };
 
 type Commitment = {
@@ -65,6 +62,7 @@ const C = {
   results: "resultTracking.results",
   imageOwners: "proofImageOwners",
   cleanup: "maintenance.imageCleanup",
+  priorities: "userPriorityGoals",
 } as const;
 
 const IMAGE_TOKEN = /^image:([0-9a-f]{24})$/;
@@ -126,46 +124,43 @@ function imageIdsFromProofs(
 }
 
 /**
- * Queue image cleanup within the deletion transaction.
+ * Queue GridFS cleanup before deleting proof records.
  *
- * These records are committed together with the
- * goal deletion and survive a server restart.
+ * This works on standalone MongoDB.
+ *
+ * A queue entry survives an interrupted deletion
+ * so a later cleanup attempt can retry.
  */
 async function queueImageCleanup(
   database: Db,
   images: ObjectId[],
-  session: ClientSession,
 ): Promise<void> {
   const jobs = database.collection<CleanupJob>(
     C.cleanup,
   );
 
   for (const imageId of images) {
-    const existing = await jobs.findOne(
-      { imageId },
-      { session },
-    );
+    const existing = await jobs.findOne({
+      imageId,
+    });
 
     if (!existing) {
-      await jobs.insertOne(
-        {
-          _id: new ObjectId(),
-          imageId,
-          createdAt: new Date(),
-        },
-        { session },
-      );
+      await jobs.insertOne({
+        _id: new ObjectId(),
+        imageId,
+        createdAt: new Date(),
+      });
     }
   }
 }
 
 /**
- * Process up to 100 pending GridFS cleanup jobs.
+ * Process pending GridFS cleanup jobs.
  *
- * A file is only removed when no remaining proof
- * references its image token.
+ * An image is retained while it is referenced
+ * by any remaining proof or resubmission.
  *
- * Failed jobs remain available for retry.
+ * This operation is best-effort and retryable.
  */
 export async function cleanupPendingGoalImages(
   database: Db,
@@ -177,12 +172,9 @@ export async function cleanupPendingGoalImages(
     C.cleanup,
   );
 
-  const bucket = new GridFSBucket(
-    database,
-    {
-      bucketName: "proofImages",
-    },
-  );
+  const bucket = new GridFSBucket(database, {
+    bucketName: "proofImages",
+  });
 
   const pendingJobs = await jobs
     .find({})
@@ -199,17 +191,12 @@ export async function cleanupPendingGoalImages(
     try {
       const original = await database
         .collection(C.proofs)
-        .findOne({
-          evidence: token,
-        });
+        .findOne({ evidence: token });
 
       const attempt = await database
         .collection(C.attempts)
-        .findOne({
-          evidence: token,
-        });
+        .findOne({ evidence: token });
 
-      // Keep images that are still referenced.
       if (original || attempt) {
         continue;
       }
@@ -237,7 +224,7 @@ export async function cleanupPendingGoalImages(
       removed += 1;
     } catch (error) {
       console.error(
-        "GridFS cleanup failed:",
+        "[image-cleanup] Failed:",
         job.imageId.toHexString(),
         error,
       );
@@ -251,501 +238,345 @@ export async function cleanupPendingGoalImages(
 }
 
 /**
- * Perform all MongoDB document changes atomically.
+ * Leave an accountability group using ordinary
+ * MongoDB operations.
  *
- * Requires MongoDB replica set support.
- *
- * Every database operation inside `operation` must
- * receive the same session.
- */
-async function inTransaction<T>(
-  database: Db,
-  operation: (
-    session: ClientSession,
-  ) => Promise<T>,
-): Promise<T> {
-  const session =
-    database.client.startSession();
-
-  try {
-    return await session.withTransaction(
-      async () => operation(session),
-      {
-        readConcern: {
-          level: "snapshot",
-        },
-        writeConcern: {
-          w: "majority",
-        },
-        readPreference: "primary",
-      },
-    );
-  } finally {
-    await session.endSession();
-  }
-}
-
-/**
- * Leave an accountability group.
- *
- * Preserve the user's personal goals, commitments
- * and proofs. Remove only group membership and
- * references associated with their own goals.
+ * The membership is removed last so that
+ * a failed cleanup can be retried.
  */
 async function leaveGroup(
   database: Db,
   groupId: string,
   user: string,
 ): Promise<Response> {
-  return inTransaction(
-    database,
-    async (session) => {
-      const groups = database.collection<Group>(
-        C.groups,
+  const groups = database.collection<Group>(
+    C.groups,
+  );
+
+  const memberships = database.collection<{
+    group: string;
+    user: string;
+    createdAt: Date;
+  }>(C.members);
+
+  const group = await groups.findOne({
+    _id: groupId,
+  });
+
+  if (!group) {
+    return fail("GROUP_NOT_FOUND", 404);
+  }
+
+  // Older groups may not store an explicit owner.
+  const firstMember = group.owner
+    ? null
+    : await memberships.findOne(
+        { group: groupId },
+        { sort: { createdAt: 1 } },
       );
 
-      const memberships = database.collection<{
-        group: string;
-        user: string;
-        createdAt: Date;
-      }>(C.members);
+  const owner =
+    group.owner ?? firstMember?.user;
 
-      const group = await groups.findOne(
-        {
-          _id: groupId,
-        },
-        { session },
-      );
+  if (owner === user) {
+    return fail(
+      "GROUP_OWNER_CANNOT_LEAVE",
+      409,
+    );
+  }
 
-      if (!group) {
-        return fail("GROUP_NOT_FOUND", 404);
-      }
+  const membership = await memberships.findOne({
+    group: groupId,
+    user,
+  });
 
-      // Support legacy groups without owner.
-      const firstMember = group.owner
-        ? null
-        : await memberships.findOne(
-            {
-              group: groupId,
-            },
-            {
-              sort: {
-                createdAt: 1,
-              },
-              session,
-            },
-          );
+  if (!membership) {
+    return fail("NOT_GROUP_MEMBER", 403);
+  }
 
-      const owner =
-        group.owner ?? firstMember?.user;
+  const ownedGoals = await database
+    .collection<Goal>(C.goals)
+    .find({ owner: user })
+    .project<{ _id: string }>({
+      _id: 1,
+    })
+    .toArray();
 
-      if (owner === user) {
-        return fail(
-          "GROUP_OWNER_CANNOT_LEAVE",
-          409,
-        );
-      }
+  const ownedIds = ownedGoals.map(
+    (goal) => goal._id,
+  );
 
-      const membership =
-        await memberships.findOne(
-          {
-            group: groupId,
-            user,
-          },
-          { session },
-        );
+  if (ownedIds.length > 0) {
+    const attachments = database.collection(
+      C.attachments,
+    );
 
-      if (!membership) {
-        return fail("NOT_GROUP_MEMBER", 403);
-      }
+    const attached = await attachments
+      .find({
+        group: groupId,
+        goal: { $in: ownedIds },
+      })
+      .project<{ goal: string }>({
+        goal: 1,
+      })
+      .toArray();
 
-      const ownedGoals = await database
-        .collection<Goal>(C.goals)
-        .find(
-          {
-            owner: user,
-          },
-          { session },
-        )
-        .project<{ _id: string }>({
-          _id: 1,
+    const attachedIds = attached.map(
+      (row) => row.goal,
+    );
+
+    if (attachedIds.length > 0) {
+      const originals = await database
+        .collection<Proof>(C.proofs)
+        .find({
+          goal: { $in: attachedIds },
         })
         .toArray();
 
-      const ownedIds = ownedGoals.map(
-        (goal) => goal._id,
-      );
+      const attempts = await database
+        .collection<Proof>(C.attempts)
+        .find({
+          goal: { $in: attachedIds },
+        })
+        .toArray();
 
-      if (ownedIds.length) {
-        const attachments =
-          database.collection(
-            C.attachments,
-          );
+      const proofIds = [
+        ...originals,
+        ...attempts,
+      ].map((row) => row._id);
 
-        const attached =
-          await attachments
-            .find(
-              {
-                group: groupId,
-                goal: {
-                  $in: ownedIds,
-                },
-              },
-              { session },
-            )
-            .project<{
-              goal: string;
-            }>({
-              goal: 1,
-            })
-            .toArray();
-
-        const attachedIds = attached.map(
-          (row) => row.goal,
-        );
-
-        if (attachedIds.length) {
-          // Do not issue parallel operations
-          // using the same MongoDB session.
-          const originals = await database
-            .collection<Proof>(C.proofs)
-            .find(
-              {
-                goal: {
-                  $in: attachedIds,
-                },
-              },
-              { session },
-            )
-            .toArray();
-
-          const attempts = await database
-            .collection<Proof>(C.attempts)
-            .find(
-              {
-                goal: {
-                  $in: attachedIds,
-                },
-              },
-              { session },
-            )
-            .toArray();
-
-          const proofIds = [
-            ...originals,
-            ...attempts,
-          ].map((row) => row._id);
-
-          if (proofIds.length) {
-            await database
-              .collection(C.shared)
-              .deleteMany(
-                {
-                  group: groupId,
-                  proof: {
-                    $in: proofIds,
-                  },
-                },
-                { session },
-              );
-          }
-
-          await attachments.deleteMany(
-            {
-              group: groupId,
-              goal: {
-                $in: attachedIds,
-              },
-            },
-            { session },
-          );
-        }
+      if (proofIds.length > 0) {
+        await database
+          .collection(C.shared)
+          .deleteMany({
+            group: groupId,
+            proof: { $in: proofIds },
+          });
       }
 
-      // Create a conflict point for concurrent
-      // transactions that update this group row.
-      await groups.updateOne(
-        {
-          _id: groupId,
-        },
-        {
-          $set: {
-            membershipChangedAt: new Date(),
-          },
-        },
-        { session },
-      );
-
-      await memberships.deleteOne(
-        {
-          group: groupId,
-          user,
-        },
-        { session },
-      );
-
-      return Response.json({
+      await attachments.deleteMany({
         group: groupId,
-        left: true,
+        goal: { $in: attachedIds },
       });
-    },
-  );
+    }
+  }
+
+  // Final step: remove this person's membership.
+  await memberships.deleteOne({
+    group: groupId,
+    user,
+  });
+
+  return Response.json({
+    group: groupId,
+    left: true,
+  });
 }
 
 /**
- * Atomically delete a goal and its associated data.
+ * Delete a goal using ordinary MongoDB operations.
  *
- * GridFS files are cleaned up after commit.
+ * Compatible with standalone MongoDB.
+ *
+ * The goal is deleted last. If an intermediate
+ * operation fails, retrying this endpoint can
+ * continue cleanup while the goal still exists.
+ *
+ * This is NOT a multi-document transaction.
  */
 async function deleteGoal(
   database: Db,
   goalId: string,
   user: string,
 ): Promise<Response> {
-  const outcome = await inTransaction(
-    database,
-    async (session) => {
-      const goals = database.collection<Goal>(
-        C.goals,
-      );
+  const goals = database.collection<Goal>(
+    C.goals,
+  );
 
-      const goal = await goals.findOne(
-        {
-          _id: goalId,
-        },
-        { session },
-      );
+  const goal = await goals.findOne({
+    _id: goalId,
+  });
 
-      if (!goal) {
-        return {
-          response: fail(
-            "GOAL_NOT_FOUND",
-            404,
-          ),
-          deleted: false,
-        };
-      }
+  if (!goal) {
+    return fail("GOAL_NOT_FOUND", 404);
+  }
 
-      if (goal.owner !== user) {
-        return {
-          response: fail(
-            "FORBIDDEN",
-            403,
-          ),
-          deleted: false,
-        };
-      }
+  if (goal.owner !== user) {
+    return fail("FORBIDDEN", 403);
+  }
 
-      // Competing deletion transactions must
-      // write to the same goal document.
-      const claimed = await goals.updateOne(
-        {
-          _id: goalId,
-          owner: user,
-        },
-        {
-          $set: {
-            deleting: true,
-          },
-        },
-        { session },
-      );
-
-      if (claimed.matchedCount !== 1) {
-        throw new Error(
-          "Goal changed during deletion.",
-        );
-      }
-
-      const commitments =
-        database.collection<Commitment>(
-          C.commitments,
-        );
-
-      const commitmentRows =
-        await commitments
-          .find(
-            {
-              goal: goalId,
-            },
-            { session },
-          )
-          .project<{
-            _id: string;
-          }>({
-            _id: 1,
-          })
-          .toArray();
-
-      const commitmentIds =
-        commitmentRows.map(
-          (row) => row._id,
-        );
-
-      const originals =
-        database.collection<Proof>(
-          C.proofs,
-        );
-
-      const attempts =
-        database.collection<Proof>(
-          C.attempts,
-        );
-
-      const proofRows = await originals
-        .find(
-          {
-            goal: goalId,
-          },
-          { session },
-        )
-        .toArray();
-
-      const attemptRows = await attempts
-        .find(
-          {
-            goal: goalId,
-          },
-          { session },
-        )
-        .toArray();
-
-      const allProofs = [
-        ...proofRows,
-        ...attemptRows,
-      ];
-
-      const proofIds = allProofs.map(
-        (row) => row._id,
-      );
-
-      // Save cleanup jobs inside the transaction.
-      await queueImageCleanup(
-        database,
-        imageIdsFromProofs(allProofs),
-        session,
-      );
-
-      if (proofIds.length) {
-        await database
-          .collection(C.shared)
-          .deleteMany(
-            {
-              proof: {
-                $in: proofIds,
-              },
-            },
-            { session },
-          );
-
-        await database
-          .collection(C.reviews)
-          .deleteMany(
-            {
-              proof: {
-                $in: proofIds,
-              },
-            },
-            { session },
-          );
-      }
-
-      await database
-        .collection(C.attachments)
-        .deleteMany(
-          {
-            goal: goalId,
-          },
-          { session },
-        );
-
-      if (commitmentIds.length) {
-        await database
-          .collection(C.completions)
-          .deleteMany(
-            {
-              commitment: {
-                $in: commitmentIds,
-              },
-            },
-            { session },
-          );
-      }
-
-      await attempts.deleteMany(
-        {
-          goal: goalId,
-        },
-        { session },
-      );
-
-      await originals.deleteMany(
-        {
-          goal: goalId,
-        },
-        { session },
-      );
-
-      await commitments.deleteMany(
-        {
-          goal: goalId,
-        },
-        { session },
-      );
-
-      await database
-        .collection(C.results)
-        .deleteMany(
-          {
-            goal: goalId,
-          },
-          { session },
-        );
-
-      const deleted = await goals.deleteOne(
-        {
-          _id: goalId,
-          owner: user,
-        },
-        { session },
-      );
-
-      if (deleted.deletedCount !== 1) {
-        throw new Error(
-          "Goal deletion could not be committed.",
-        );
-      }
-
-      return {
-        response: Response.json({
-          goal: goalId,
-          deleted: true,
-        }),
-        deleted: true,
-      };
+  // Mark deletion intent.
+  // Repeating this update is safe on retry.
+  await goals.updateOne(
+    {
+      _id: goalId,
+      owner: user,
+    },
+    {
+      $set: {
+        deleting: true,
+      },
     },
   );
 
-  if (outcome.deleted) {
-    try {
-      await cleanupPendingGoalImages(database);
-    } catch (error) {
-      // Goal deletion already committed.
-      // Cleanup jobs survive for startup recovery.
-      console.error(
-        "Post-commit image cleanup failed:",
-        error,
-      );
-    }
+  const commitments =
+    database.collection<Commitment>(
+      C.commitments,
+    );
+
+  const commitmentRows = await commitments
+    .find({ goal: goalId })
+    .project<{ _id: string }>({
+      _id: 1,
+    })
+    .toArray();
+
+  const commitmentIds = commitmentRows.map(
+    (row) => row._id,
+  );
+
+  const originals = database.collection<Proof>(
+    C.proofs,
+  );
+
+  const attempts = database.collection<Proof>(
+    C.attempts,
+  );
+
+  const proofRows = await originals
+    .find({ goal: goalId })
+    .toArray();
+
+  const attemptRows = await attempts
+    .find({ goal: goalId })
+    .toArray();
+
+  const allProofs = [
+    ...proofRows,
+    ...attemptRows,
+  ];
+
+  const proofIds = allProofs.map(
+    (proof) => proof._id,
+  );
+
+  /*
+   * Save image cleanup jobs BEFORE deleting
+   * any proof records.
+   */
+  await queueImageCleanup(
+    database,
+    imageIdsFromProofs(allProofs),
+  );
+
+  /*
+   * Remove references to proofs before removing
+   * the proof documents themselves.
+   */
+  if (proofIds.length > 0) {
+    await database
+      .collection(C.shared)
+      .deleteMany({
+        proof: { $in: proofIds },
+      });
+
+    await database
+      .collection(C.reviews)
+      .deleteMany({
+        proof: { $in: proofIds },
+      });
   }
 
-  return outcome.response;
+  await database
+    .collection(C.attachments)
+    .deleteMany({
+      goal: goalId,
+    });
+
+  if (commitmentIds.length > 0) {
+    await database
+      .collection(C.completions)
+      .deleteMany({
+        commitment: {
+          $in: commitmentIds,
+        },
+      });
+  }
+
+  await attempts.deleteMany({
+    goal: goalId,
+  });
+
+  await originals.deleteMany({
+    goal: goalId,
+  });
+
+  await commitments.deleteMany({
+    goal: goalId,
+  });
+
+  await database
+    .collection(C.results)
+    .deleteMany({
+      goal: goalId,
+    });
+
+  /*
+   * Clear the user's selected priority if this
+   * goal was their priority.
+   */
+  await database
+    .collection<{
+        _id: string;
+        goal: string;
+    }>(C.priorities)
+    .deleteOne({
+        _id: user,
+        goal: goalId,
+    });
+
+  /*
+   * Delete the goal last.
+   *
+   * This also serves as the final success marker
+   * for the endpoint.
+   */
+  const deleted = await goals.deleteOne({
+    _id: goalId,
+    owner: user,
+  });
+
+  if (deleted.deletedCount !== 1) {
+    throw new Error(
+      "Goal deletion could not be completed.",
+    );
+  }
+
+  /*
+   * Once the goal is deleted, image cleanup may
+   * proceed. Cleanup errors do not undo deletion.
+   */
+  try {
+    await cleanupPendingGoalImages(database);
+  } catch (error) {
+    console.error(
+      "[goal-delete] Image cleanup failed:",
+      error,
+    );
+  }
+
+  return Response.json({
+    goal: goalId,
+    deleted: true,
+  });
 }
 
 /**
  * HTTP endpoints:
- *   POST /api/groups/leave
- *   POST /api/goals/delete
+ * POST /api/groups/leave
+ * POST /api/goals/delete
+ *
+ * Authentication is required for both.
  */
 export async function handleResourceManagementRequest(
   request: Request,
@@ -762,22 +593,21 @@ export async function handleResourceManagementRequest(
   let input: Record<string, unknown>;
 
   try {
-    input = await request.json() as Record<
-      string,
-      unknown
-    >;
-  } catch {
-    return fail(
-      "INVALID_REQUEST",
-      400,
-    );
-  }
+    const parsed: unknown = await request.json();
 
-  if (
-    !input ||
-    typeof input !== "object" ||
-    Array.isArray(input)
-  ) {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      return fail(
+        "INVALID_REQUEST",
+        400,
+      );
+    }
+
+    input = parsed as Record<string, unknown>;
+  } catch {
     return fail(
       "INVALID_REQUEST",
       400,
@@ -801,9 +631,7 @@ export async function handleResourceManagementRequest(
   ).pathname;
 
   try {
-    if (
-      path === "/api/groups/leave"
-    ) {
+    if (path === "/api/groups/leave") {
       if (
         typeof input.group !== "string" ||
         !input.group.trim()
@@ -821,9 +649,7 @@ export async function handleResourceManagementRequest(
       );
     }
 
-    if (
-      path === "/api/goals/delete"
-    ) {
+    if (path === "/api/goals/delete") {
       if (
         typeof input.goal !== "string" ||
         !input.goal.trim()
@@ -836,10 +662,7 @@ export async function handleResourceManagementRequest(
 
       const goalId = input.goal;
 
-      // Change 012:
-      // Wait for earlier goal operations before
-      // entering the deletion transaction.
-      return await withGoalLock(
+      return withGoalLock(
         goalId,
         () => deleteGoal(
           database,
@@ -849,13 +672,10 @@ export async function handleResourceManagementRequest(
       );
     }
 
-    return fail(
-      "NOT_FOUND",
-      404,
-    );
+    return fail("NOT_FOUND", 404);
   } catch (error) {
     console.error(
-      "Resource management transaction failed:",
+      "[resource-management] Failed:",
       error,
     );
 

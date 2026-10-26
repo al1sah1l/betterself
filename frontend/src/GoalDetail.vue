@@ -73,6 +73,7 @@ const overview = ref<GoalDetailData | null>(null);
 const selectedCommitment = ref("");
 const showProofPicker = ref(false);
 const proofMessage = ref("");
+const settingsDialog = ref<HTMLDialogElement | null>(null);
 
 const activeDescription = computed(() => {
   switch (activeSection.value) {
@@ -89,10 +90,7 @@ const availableForProof = computed(() =>
   (overview.value?.commitments ?? []).filter(
     (item) =>
       item.active &&
-      (
-        item.recurring ||
-        (item.proofs?.length ?? 0) === 0
-      ),
+      (item.recurring || (item.proofs?.length ?? 0) === 0),
   ),
 );
 
@@ -135,6 +133,25 @@ function goalDeleted() {
   emit("deleted");
 }
 
+async function openSettings() {
+  settingsDialog.value?.showModal();
+  await nextTick();
+
+  const panel = settingsDialog.value?.querySelector<HTMLDetailsElement>(
+    "details.plan-controls",
+  );
+  if (panel) panel.open = true;
+}
+
+function closeSettings() {
+  settingsDialog.value?.close();
+}
+
+function settingsDeleted() {
+  closeSettings();
+  goalDeleted();
+}
+
 function openProofPicker() {
   proofMessage.value = "";
   showProofPicker.value = true;
@@ -144,14 +161,12 @@ function openProofPicker() {
 
 async function jumpToProof() {
   if (!selectedCommitment.value) {
-    proofMessage.value =
-      "Choose the commitment you want to prove.";
+    proofMessage.value = "Choose the commitment you want to prove.";
     return;
   }
 
   activeSection.value = "plan";
   proofMessage.value = "";
-
   await nextTick();
 
   const card = document.getElementById(
@@ -175,18 +190,14 @@ async function jumpToProof() {
   }
 
   details.open = true;
-
   card.scrollIntoView({
-    behavior: window.matchMedia(
-      "(prefers-reduced-motion: reduce)",
-    ).matches
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
       ? "instant"
       : "smooth",
     block: "center",
   });
 
   showProofPicker.value = false;
-
   await nextTick();
 
   const firstField = details.querySelector<
@@ -199,6 +210,7 @@ async function jumpToProof() {
 watch(
   () => [props.session, props.goal],
   () => {
+    closeSettings();
     selectedCommitment.value = "";
     showProofPicker.value = false;
     activeSection.value = "plan";
@@ -214,17 +226,8 @@ onMounted(loadOverview);
   <div class="goal-workspace">
     <header class="workspace-intro">
       <div class="workspace-intro-content">
-        <p class="workspace-eyebrow">
-          YOUR GOAL WORKSPACE
-        </p>
-
-        <h1>
-          {{
-            overview?.outcome ||
-            "Your next big step"
-          }}
-        </h1>
-
+        <p class="workspace-eyebrow">YOUR GOAL WORKSPACE</p>
+        <h1>{{ overview?.outcome || "Your next big step" }}</h1>
         <p class="intro-description">
           {{
             overview?.timeline
@@ -232,17 +235,10 @@ onMounted(loadOverview);
               : "Your goal, your strategy, your progress."
           }}
         </p>
-
         <div class="hero-actions">
-          <button
-            type="button"
-            class="hero-primary"
-            @click="openProofPicker"
-          >
-            Submit proof
-            <span aria-hidden="true">↗</span>
+          <button type="button" class="hero-primary" @click="openProofPicker">
+            Submit proof <span aria-hidden="true">↗</span>
           </button>
-
           <button
             type="button"
             class="hero-secondary"
@@ -252,11 +248,7 @@ onMounted(loadOverview);
           </button>
         </div>
       </div>
-
-      <div
-        class="workspace-intro-art"
-        aria-hidden="true"
-      >
+      <div class="workspace-intro-art" aria-hidden="true">
         <span>✧</span>
         <span>✦</span>
       </div>
@@ -281,7 +273,6 @@ onMounted(loadOverview);
             directly to its proof form.
           </p>
         </div>
-
         <button
           class="close-quick-proof"
           type="button"
@@ -292,22 +283,10 @@ onMounted(loadOverview);
         </button>
       </div>
 
-      <div
-        v-if="availableForProof.length"
-        class="quick-proof-controls"
-      >
-        <label for="quick-proof-commitment">
-          Commitment
-        </label>
-
-        <select
-          id="quick-proof-commitment"
-          v-model="selectedCommitment"
-        >
-          <option disabled value="">
-            Select a commitment
-          </option>
-
+      <div v-if="availableForProof.length" class="quick-proof-controls">
+        <label for="quick-proof-commitment">Commitment</label>
+        <select id="quick-proof-commitment" v-model="selectedCommitment">
+          <option disabled value="">Select a commitment</option>
           <option
             v-for="item in availableForProof"
             :key="item.commitment"
@@ -316,7 +295,6 @@ onMounted(loadOverview);
             {{ item.description }}
           </option>
         </select>
-
         <button
           type="button"
           class="quick-proof-button"
@@ -332,12 +310,7 @@ onMounted(loadOverview);
         for a new proof. Add a commitment or review
         your existing submissions below.
       </p>
-
-      <p
-        v-if="proofMessage"
-        class="quick-proof-error"
-        role="alert"
-      >
+      <p v-if="proofMessage" class="quick-proof-error" role="alert">
         {{ proofMessage }}
       </p>
     </section>
@@ -348,41 +321,24 @@ onMounted(loadOverview);
       :revision="progressRevision"
     />
 
-    <nav
-      class="workspace-tabs"
-      aria-label="Goal sections"
-    >
+    <nav class="workspace-tabs" aria-label="Goal sections">
       <button
         v-for="section in sections"
         :key="section.id"
         type="button"
         class="workspace-tab"
         :class="{
-          'workspace-tab--active':
-            activeSection === section.id,
+          'workspace-tab--active': activeSection === section.id,
         }"
-        :aria-current="
-          activeSection === section.id
-            ? 'page'
-            : undefined
-        "
+        :aria-current="activeSection === section.id ? 'page' : undefined"
         @click="selectSection(section.id)"
       >
-        <span class="tab-number">
-          {{ section.number }}
-        </span>
-
+        <span class="tab-number">{{ section.number }}</span>
         <span class="tab-copy">
           <strong>{{ section.title }}</strong>
           <small>{{ section.description }}</small>
         </span>
-
-        <span
-          class="tab-arrow"
-          aria-hidden="true"
-        >
-          ↗
-        </span>
+        <span class="tab-arrow" aria-hidden="true">↗</span>
       </button>
     </nav>
 
@@ -397,7 +353,6 @@ onMounted(loadOverview);
                 : "LEARN AND ADAPT"
           }}
         </p>
-
         <h2>
           {{
             activeSection === "plan"
@@ -407,7 +362,6 @@ onMounted(loadOverview);
                 : "Progress review"
           }}
         </h2>
-
         <p>{{ activeDescription }}</p>
       </div>
     </div>
@@ -421,14 +375,7 @@ onMounted(loadOverview);
         :key="`detail-${session}-${goal}-${revision}`"
         :session="session"
         :goal="goal"
-      />
-
-      <PlanControls
-        :key="`plan-${session}-${goal}`"
-        :session="session"
-        :goal="goal"
-        @saved="planSaved"
-        @deleted="goalDeleted"
+        @open-settings="openSettings"
       />
     </section>
 
@@ -461,6 +408,32 @@ onMounted(loadOverview);
       <span aria-hidden="true">✦</span>
       Small steps. Meaningful progress. BetterSelf.
     </footer>
+
+    <dialog
+      ref="settingsDialog"
+      class="goal-settings-dialog"
+      aria-label="Goal settings"
+    >
+      <div class="settings-dialog-header">
+        <h2>Goal Settings</h2>
+        <button
+          type="button"
+          class="settings-close-button"
+          aria-label="Close goal settings"
+          @click="closeSettings"
+        >
+          ×
+        </button>
+      </div>
+
+      <PlanControls
+        :key="`plan-${session}-${goal}`"
+        :session="session"
+        :goal="goal"
+        @saved="planSaved"
+        @deleted="settingsDeleted"
+      />
+    </dialog>
   </div>
 </template>
 
@@ -799,6 +772,46 @@ onMounted(loadOverview);
 
 .workspace-footer span {
   color: var(--accent);
+}
+
+.goal-settings-dialog {
+  width: min(650px, calc(100% - 32px));
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 24px;
+  border: 1px solid #e2d7f3;
+  border-radius: 20px;
+  background: white;
+  color: var(--text);
+  box-shadow: 0 25px 80px rgba(47, 30, 85, 0.25);
+}
+
+.goal-settings-dialog::backdrop {
+  background: rgba(32, 22, 53, 0.48);
+}
+
+.settings-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 15px;
+}
+
+.settings-dialog-header h2 {
+  margin: 0;
+  font-size: 23px;
+}
+
+.settings-close-button {
+  width: 37px;
+  height: 37px;
+  border: 0;
+  border-radius: 9px;
+  background: #f2ecfc;
+  color: #7354c5;
+  font-size: 24px;
+  cursor: pointer;
 }
 
 @media (max-width: 850px) {
