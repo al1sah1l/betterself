@@ -7,7 +7,8 @@ import {
   ref,
 } from "vue";
 
-import { ApiError } from "./api";
+import { api, ApiError } from "./api";
+import PriorityGoalPicker from "./PriorityGoalPicker.vue";
 
 import {
   completedCount,
@@ -33,6 +34,8 @@ const emit = defineEmits<{
 }>();
 
 const goals = ref<GoalOverview[]>([]);
+const priorityGoal = ref<string | null>(null);
+
 const loading = ref(false);
 const loaded = ref(false);
 const error = ref("");
@@ -46,28 +49,46 @@ async function refresh() {
   error.value = "";
 
   try {
-    const response = await loadGoalOverviews(
-      props.session,
-    );
+    const [response, priorityResponse] =
+      await Promise.all([
+        loadGoalOverviews(props.session),
+        api<{ goal: string | null }>(
+          "/goals/priority",
+          { session: props.session },
+        ),
+      ]);
 
-    if (id === requestId) {
-      goals.value = response;
-      loaded.value = true;
-    }
+    if (id !== requestId) return;
+
+    goals.value = response;
+    priorityGoal.value = priorityResponse.goal;
+    loaded.value = true;
   } catch (cause) {
-    if (id === requestId) {
-      error.value =
-        cause instanceof ApiError &&
-        cause.code === "UNAUTHORIZED"
-          ? "Your session expired. Please sign in again."
-          : "Could not load your dashboard. Please try again.";
-    }
+    if (id !== requestId) return;
+
+    error.value =
+      cause instanceof ApiError &&
+      cause.code === "UNAUTHORIZED"
+        ? "Your session expired. Please sign in again."
+        : "Could not load your dashboard. Please try again.";
   } finally {
     if (id === requestId) {
       loading.value = false;
     }
   }
 }
+
+function priorityChanged(goal: string | null) {
+  priorityGoal.value = goal;
+}
+
+const orderedGoals = computed(() =>
+  [...goals.value].sort((a, b) => {
+    if (a.goal === priorityGoal.value) return -1;
+    if (b.goal === priorityGoal.value) return 1;
+    return 0;
+  }),
+);
 
 const allCommitments = computed(() =>
   goals.value.flatMap(
@@ -123,7 +144,7 @@ function recurringCount(goal: GoalOverview) {
 }
 
 const currentCommitments = computed(() =>
-  goals.value
+  orderedGoals.value
     .flatMap((goal) =>
       goal.commitments
         .filter((item) => item.active)
@@ -145,7 +166,7 @@ onActivated(refresh);
     class="dashboard"
     aria-labelledby="dashboard-title"
   >
-    <div class="welcome-banner">
+    <header class="welcome-banner">
       <div class="welcome-content">
         <p class="eyebrow">
           YOUR PERSONAL GROWTH SPACE
@@ -175,11 +196,9 @@ onActivated(refresh);
         class="banner-decoration"
         aria-hidden="true"
       >
-        <div class="decoration-circle circle-one" />
-        <div class="decoration-circle circle-two" />
-        <span class="decoration-star">✦</span>
+        <span>✦</span>
       </div>
-    </div>
+    </header>
 
     <div class="dashboard-toolbar">
       <div>
@@ -190,8 +209,8 @@ onActivated(refresh);
       </div>
 
       <button
-        class="refresh-button"
         type="button"
+        class="refresh-button"
         :disabled="loading"
         @click="refresh"
       >
@@ -199,25 +218,24 @@ onActivated(refresh);
       </button>
     </div>
 
-    <p
+    <div
       v-if="error"
-      class="error"
+      class="error-panel"
       role="alert"
     >
-      {{ error }}
+      <p>{{ error }}</p>
 
       <button
         type="button"
-        class="retry-button"
         @click="refresh"
       >
         Try again
       </button>
-    </p>
+    </div>
 
     <p
       v-if="loading && !loaded"
-      class="muted"
+      class="loading-message"
       role="status"
     >
       Loading your dashboard...
@@ -226,77 +244,64 @@ onActivated(refresh);
     <template v-if="loaded">
       <div class="stats-grid">
         <article class="stat-card">
-          <div class="stat-icon">
-            ◎
-          </div>
-
+          <span class="stat-icon">◎</span>
           <strong class="stat-number">
             {{ goals.length }}
           </strong>
-
           <span class="stat-label">
             My goals
           </span>
-
           <span class="stat-footnote">
             Your personal objectives
           </span>
         </article>
 
         <article class="stat-card">
-          <div class="stat-icon">
-            ✓
-          </div>
-
+          <span class="stat-icon">✓</span>
           <strong class="stat-number">
             {{ activeCommitments }}
           </strong>
-
           <span class="stat-label">
             Active commitments
           </span>
-
           <span class="stat-footnote">
             Actions you're working on
           </span>
         </article>
 
         <article class="stat-card">
-          <div class="stat-icon">
-            ✦
-          </div>
-
+          <span class="stat-icon">✦</span>
           <strong class="stat-number">
             {{ completionClaims }}
           </strong>
-
           <span class="stat-label">
             Completion claims
           </span>
-
           <span class="stat-footnote">
             Recorded execution
           </span>
         </article>
 
         <article class="stat-card">
-          <div class="stat-icon">
-            ◈
-          </div>
-
+          <span class="stat-icon">◈</span>
           <strong class="stat-number">
             {{ goalsWithActivity }}
           </strong>
-
           <span class="stat-label">
             Goals with activity
           </span>
-
           <span class="stat-footnote">
             Goals with completed actions
           </span>
         </article>
       </div>
+
+      <PriorityGoalPicker
+        v-if="goals.length"
+        :session="session"
+        class="priority-panel"
+        @changed="priorityChanged"
+      />
 
       <section
         class="goals-section"
@@ -307,7 +312,6 @@ onActivated(refresh);
             <p class="section-eyebrow">
               WHERE YOU'RE HEADED
             </p>
-
             <h2 id="my-goals-title">
               Your goals
             </h2>
@@ -326,15 +330,10 @@ onActivated(refresh);
           v-if="!goals.length"
           class="empty-state"
         >
-          <div
-            class="empty-icon"
-            aria-hidden="true"
-          >
-            ◎
-          </div>
-
-          <h3>Every great journey starts somewhere.</h3>
-
+          <span class="empty-icon">◎</span>
+          <h3>
+            Every great journey starts somewhere.
+          </h3>
           <p>
             Create your first goal, build a strategy,
             and turn it into achievable commitments.
@@ -354,20 +353,38 @@ onActivated(refresh);
           class="goal-grid"
         >
           <article
-            v-for="goal in goals"
+            v-for="goal in orderedGoals"
             :key="goal.goal"
             class="goal-card"
+            :class="{
+              'goal-card--priority':
+                goal.goal === priorityGoal,
+            }"
           >
             <div class="goal-card-top">
-              <span class="goal-label">
-                MY GOAL
+              <span
+                class="goal-label"
+                :class="{
+                  'goal-label--priority':
+                    goal.goal === priorityGoal,
+                }"
+              >
+                {{
+                  goal.goal === priorityGoal
+                    ? "★ CURRENT PRIORITY"
+                    : "MY GOAL"
+                }}
               </span>
 
               <span
                 class="goal-sparkle"
                 aria-hidden="true"
               >
-                ✧
+                {{
+                  goal.goal === priorityGoal
+                    ? "★"
+                    : "✧"
+                }}
               </span>
             </div>
 
@@ -384,7 +401,6 @@ onActivated(refresh);
             <div class="goal-details">
               <div class="goal-detail-row">
                 <span>Active commitments</span>
-
                 <strong>
                   {{
                     goal.commitments.filter(
@@ -395,8 +411,9 @@ onActivated(refresh);
               </div>
 
               <div class="goal-detail-row">
-                <span>Recurring completion claims</span>
-
+                <span>
+                  Recurring completion claims
+                </span>
                 <strong>
                   {{ recurringCount(goal) }}
                 </strong>
@@ -406,7 +423,6 @@ onActivated(refresh);
             <div class="goal-progress">
               <div class="goal-progress-heading">
                 <span>One-time commitments</span>
-
                 <strong>
                   {{ oneTimeStats(goal).completed }}
                   /
@@ -448,7 +464,12 @@ onActivated(refresh);
             <button
               type="button"
               class="open-goal"
-              @click="emit('open-goal', goal.goal)"
+              :aria-label="
+                `Open goal: ${goal.outcome}`
+              "
+              @click="
+                emit('open-goal', goal.goal)
+              "
             >
               Open goal
               <span aria-hidden="true">→</span>
@@ -463,9 +484,7 @@ onActivated(refresh);
             <span class="new-goal-plus">
               +
             </span>
-
             <strong>Add a new goal</strong>
-
             <span>
               What's your next big thing?
             </span>
@@ -482,7 +501,6 @@ onActivated(refresh);
             <p class="section-eyebrow">
               SMALL STEPS, BIG CHANGES
             </p>
-
             <h2 id="commitments-title">
               Your commitments
             </h2>
@@ -491,7 +509,9 @@ onActivated(refresh);
           <button
             type="button"
             class="section-link"
-            @click="emit('navigate', 'commitments')"
+            @click="
+              emit('navigate', 'commitments')
+            "
           >
             View all →
           </button>
@@ -525,6 +545,14 @@ onActivated(refresh);
 
               <p>
                 {{ item.goalOutcome }}
+                <span
+                  v-if="
+                    item.goalId === priorityGoal
+                  "
+                  class="commitment-priority"
+                >
+                  ★ Priority
+                </span>
               </p>
 
               <span class="commitment-schedule">
@@ -544,7 +572,9 @@ onActivated(refresh);
               :aria-label="
                 `Open goal for ${item.description}`
               "
-              @click="emit('open-goal', item.goalId)"
+              @click="
+                emit('open-goal', item.goalId)
+              "
             >
               →
             </button>
@@ -569,14 +599,12 @@ onActivated(refresh);
   min-width: 0;
 }
 
-/* Welcome banner */
-
 .welcome-banner {
   position: relative;
-  overflow: hidden;
-  min-height: 218px;
   display: flex;
   align-items: center;
+  min-height: 218px;
+  overflow: hidden;
   padding: 32px;
   border-radius: 22px;
   background: linear-gradient(
@@ -591,160 +619,138 @@ onActivated(refresh);
 .welcome-content {
   position: relative;
   z-index: 1;
-  max-width: 590px;
 }
 
 .eyebrow {
   margin: 0 0 12px;
+  color: #eee3ff;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.15em;
-  color: #e9dcff;
+  letter-spacing: 0.13em;
 }
 
 .welcome-banner h1 {
   margin: 0;
   color: white;
-  font-size: clamp(26px, 3.5vw, 38px);
-  line-height: 1.2;
-  letter-spacing: -0.04em;
+  font-size: clamp(30px, 4vw, 43px);
+  letter-spacing: -0.045em;
+}
+
+.welcome-banner h1 span {
+  color: #f3dfff;
 }
 
 .welcome-description {
-  margin: 12px 0 20px;
-  line-height: 1.6;
+  max-width: 440px;
+  margin: 13px 0 22px;
+  color: #f7efff;
   font-size: 14px;
-  color: #f4eeff;
+  line-height: 1.6;
 }
 
 .welcome-button {
   display: inline-flex;
   align-items: center;
-  gap: 14px;
-  padding: 12px 17px;
+  gap: 15px;
+  padding: 12px 18px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 11px;
   background: white;
-  color: #6743b8;
+  color: #6844b8;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 800;
   cursor: pointer;
-}
-
-.welcome-button:hover {
-  background: #f2eaff;
 }
 
 .banner-decoration {
   position: absolute;
-  inset: 0;
+  right: 9%;
+  top: -45px;
+  font-size: 230px;
+  color: #fff;
+  opacity: 0.14;
   pointer-events: none;
 }
-
-.decoration-circle {
-  position: absolute;
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  border-radius: 50%;
-}
-
-.circle-one {
-  width: 280px;
-  height: 280px;
-  right: -75px;
-  top: -130px;
-}
-
-.circle-two {
-  width: 210px;
-  height: 210px;
-  right: 35px;
-  bottom: -135px;
-}
-
-.decoration-star {
-  position: absolute;
-  right: 80px;
-  top: 55px;
-  font-size: 74px;
-  opacity: 0.35;
-}
-
-/* Headings */
 
 .dashboard-toolbar,
 .section-heading {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
 }
 
 .dashboard-toolbar h2,
 .section-heading h2 {
   margin: 0;
-  font-size: 23px;
-  letter-spacing: -0.035em;
+  color: var(--text);
+  font-size: 26px;
+  letter-spacing: -0.04em;
 }
 
-.dashboard-toolbar .muted {
-  margin: 5px 0 0;
+.muted,
+.dashboard-toolbar p {
+  margin: 7px 0 0;
+  color: var(--muted);
   font-size: 13px;
-}
-
-.section-eyebrow {
-  margin: 0 0 6px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: var(--accent);
+  line-height: 1.6;
 }
 
 .refresh-button {
   flex-shrink: 0;
-  padding: 10px 14px;
+  padding: 11px 15px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: white;
   color: var(--accent);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 700;
   cursor: pointer;
 }
 
-.section-link {
-  flex-shrink: 0;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 750;
-  cursor: pointer;
+.refresh-button:disabled {
+  opacity: 0.6;
 }
 
-.retry-button {
-  margin-left: 12px;
-  border: 0;
-  background: transparent;
-  font-weight: 750;
+.error-panel {
+  padding: 16px;
+  border: 1px solid #eab9c3;
+  border-radius: 12px;
+  background: #fff5f7;
+  color: #a32939;
+}
+
+.error-panel button {
+  padding: 9px 12px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  background: white;
   color: inherit;
-  text-decoration: underline;
   cursor: pointer;
 }
 
-/* Metrics */
+.loading-message {
+  color: var(--muted);
+  font-size: 13px;
+}
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(
+    4,
+    minmax(0, 1fr)
+  );
+  gap: 15px;
 }
 
 .stat-card {
-  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  padding: 19px;
+  min-width: 0;
+  gap: 10px;
+  padding: 22px;
   border: 1px solid var(--border);
   border-radius: 17px;
   background: white;
@@ -753,148 +759,190 @@ onActivated(refresh);
 .stat-icon {
   display: grid;
   place-items: center;
-  width: 35px;
-  height: 35px;
-  margin-bottom: 14px;
-  border-radius: 10px;
+  width: 39px;
+  height: 39px;
+  border-radius: 11px;
   background: #f0eafd;
   color: var(--accent);
-  font-size: 21px;
+  font-size: 22px;
 }
 
 .stat-number {
   color: var(--accent);
-  font-size: 32px;
-  line-height: 1.1;
+  font-size: 33px;
+  line-height: 1;
 }
 
 .stat-label {
-  margin-top: 7px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 750;
-  line-height: 1.4;
+  color: var(--text);
 }
 
 .stat-footnote {
-  margin-top: 7px;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
 }
 
-/* Goal cards */
+.priority-panel {
+  margin: 0;
+}
 
 .goals-section,
 .commitments-section {
   display: grid;
-  gap: 18px;
+  gap: 22px;
+}
+
+.section-eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.section-link {
+  padding: 7px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
 }
 
 .goal-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(
+    2,
+    minmax(0, 1fr)
+  );
+  gap: 18px;
 }
 
 .goal-card {
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  padding: 23px;
+  min-width: 0;
+  padding: 25px;
   border: 1px solid var(--border);
-  border-radius: 18px;
+  border-radius: 20px;
   background: white;
-  overflow-wrap: anywhere;
   transition:
-    border-color 0.2s,
+    transform 0.2s,
     box-shadow 0.2s,
-    transform 0.2s;
+    border-color 0.2s;
 }
 
 .goal-card:hover {
-  border-color: #b9a4ea;
-  box-shadow: 0 10px 30px rgba(70, 48, 130, 0.08);
   transform: translateY(-2px);
+  border-color: #baa5e5;
+  box-shadow: 0 10px 25px rgba(
+    75,
+    50,
+    135,
+    0.07
+  );
+}
+
+.goal-card--priority {
+  border: 2px solid #7951cb;
+  background: linear-gradient(
+    145deg,
+    #fff 65%,
+    #f6f0ff 100%
+  );
+  box-shadow: 0 10px 30px rgba(
+    105,
+    65,
+    180,
+    0.11
+  );
 }
 
 .goal-card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
 }
 
 .goal-label {
-  padding: 5px 9px;
-  border-radius: 7px;
+  padding: 7px 11px;
+  border-radius: 9px;
   background: #f0eafd;
   color: #7354c5;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 800;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
+}
+
+.goal-label--priority {
+  background: #7354c5;
+  color: white;
 }
 
 .goal-sparkle {
-  color: #b49be6;
-  font-size: 23px;
+  color: #b59be9;
+  font-size: 25px;
+}
+
+.goal-card--priority .goal-sparkle {
+  color: #7354c5;
 }
 
 .goal-card h3 {
-  margin: 20px 0 8px;
-  font-size: 19px;
-  line-height: 1.35;
-  letter-spacing: -0.02em;
+  margin: 25px 0 12px;
+  color: var(--text);
+  font-size: clamp(17px, 2vw, 21px);
+  line-height: 1.4;
+  letter-spacing: -0.025em;
+  overflow-wrap: anywhere;
 }
 
 .goal-timeline {
-  margin: 0 0 22px;
+  margin: 0 0 26px;
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 13px;
 }
 
 .goal-details {
   display: grid;
-  gap: 10px;
+  gap: 13px;
   margin-top: auto;
 }
 
-.goal-detail-row {
+.goal-detail-row,
+.goal-progress-heading {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
 }
 
-.goal-detail-row span {
+.goal-detail-row span,
+.goal-progress-heading span {
   color: var(--muted);
 }
 
-.goal-detail-row strong {
-  color: var(--text);
-}
-
-.goal-progress {
-  margin-top: 20px;
-}
-
-.goal-progress-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 9px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
+.goal-detail-row strong,
 .goal-progress-heading strong {
   color: var(--text);
 }
 
+.goal-progress {
+  margin-top: 23px;
+}
+
 .progress-track {
   height: 9px;
+  margin-top: 10px;
   overflow: hidden;
   border-radius: 999px;
-  background: #eee8f9;
+  background: #eee7fa;
 }
 
 .progress-fill {
@@ -902,31 +950,32 @@ onActivated(refresh);
   border-radius: inherit;
   background: linear-gradient(
     90deg,
-    #7354c5,
-    #aa8be5
+    #7651c6,
+    #af8de8
   );
-  transition: width 0.25s ease;
+  transition: width 0.2s;
 }
 
 .progress-note {
-  margin: 8px 0 0;
+  margin: 9px 0 0;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .open-goal {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: center;
   width: 100%;
-  margin-top: 22px;
-  padding: 12px 14px;
+  gap: 12px;
+  margin-top: 25px;
+  padding: 14px 17px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 11px;
   background: #f0eafd;
   color: #6743b8;
   font-size: 13px;
-  font-weight: 750;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -934,34 +983,39 @@ onActivated(refresh);
   background: #e5d8fa;
 }
 
+.goal-card--priority .open-goal {
+  background: #7354c5;
+  color: white;
+}
+
+.goal-card--priority .open-goal:hover {
+  background: #6041b1;
+}
+
 .new-goal-card {
-  min-height: 260px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 13px;
+  min-height: 280px;
+  gap: 12px;
   padding: 24px;
-  border: 2px dashed #cfbee9;
-  border-radius: 18px;
+  border: 2px dashed #cfbfea;
+  border-radius: 20px;
   background: #fbf9ff;
   color: var(--accent);
-  cursor: pointer;
   text-align: center;
-}
-
-.new-goal-card:hover {
-  background: #f2ecfd;
+  cursor: pointer;
 }
 
 .new-goal-plus {
   display: grid;
   place-items: center;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
-  background: #e9ddfc;
-  font-size: 28px;
+  background: #e9defb;
+  font-size: 31px;
 }
 
 .new-goal-card strong {
@@ -973,10 +1027,8 @@ onActivated(refresh);
   font-size: 12px;
 }
 
-/* Empty state */
-
 .empty-state {
-  padding: 36px 22px;
+  padding: 42px 24px;
   border: 1px dashed #cfbee9;
   border-radius: 18px;
   background: white;
@@ -984,45 +1036,44 @@ onActivated(refresh);
 }
 
 .empty-icon {
-  font-size: 38px;
   color: var(--accent);
+  font-size: 37px;
 }
 
 .empty-state h3 {
-  margin: 12px 0;
+  font-size: 21px;
 }
 
 .empty-state p {
+  max-width: 440px;
+  margin: 12px auto 20px;
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .empty-action {
-  margin-top: 14px;
-  padding: 12px 18px;
+  padding: 12px 17px;
   border: 0;
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--accent);
   color: white;
   font-weight: 750;
   cursor: pointer;
 }
 
-/* Commitments */
-
 .commitments-panel {
-  padding: 4px 21px;
+  padding: 12px 22px;
   border: 1px solid var(--border);
-  border-radius: 17px;
+  border-radius: 19px;
   background: white;
 }
 
 .commitment-row {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 19px 0;
+  gap: 16px;
+  padding: 18px 0;
   border-bottom: 1px solid var(--border);
 }
 
@@ -1033,89 +1084,91 @@ onActivated(refresh);
 .commitment-marker {
   display: grid;
   place-items: center;
-  flex-shrink: 0;
-  width: 37px;
-  height: 37px;
-  border-radius: 11px;
-  background: #efe8fb;
-  color: var(--accent);
-  font-size: 18px;
+  flex: 0 0 43px;
+  height: 43px;
+  border-radius: 12px;
+  background: #efe7fc;
+  color: #7354c5;
+  font-size: 20px;
 }
 
 .commitment-info {
   flex: 1;
   min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 .commitment-info strong {
-  display: block;
-  font-size: 13px;
-  line-height: 1.5;
+  font-size: 14px;
+  color: var(--text);
 }
 
 .commitment-info p {
-  margin: 5px 0;
+  margin: 6px 0;
   color: var(--muted);
   font-size: 12px;
 }
 
 .commitment-schedule {
-  display: inline-block;
-  margin-top: 3px;
-  color: var(--accent);
+  color: var(--muted);
   font-size: 11px;
-  font-weight: 650;
+}
+
+.commitment-priority {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  background: #efe7fc;
+  color: #6843b0;
+  font-size: 10px;
+  font-weight: 750;
 }
 
 .commitment-open {
   flex-shrink: 0;
-  padding: 7px;
+  padding: 10px 14px;
   border: 0;
-  background: transparent;
+  border-radius: 10px;
+  background: #f0eafd;
   color: var(--accent);
-  font-size: 22px;
+  font-size: 17px;
   cursor: pointer;
 }
 
 .dashboard-disclaimer {
   margin: 0;
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 11px;
   line-height: 1.7;
 }
 
-/* Responsive */
-
-@media (max-width: 1050px) {
+@media (max-width: 1000px) {
   .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(
+      2,
+      minmax(0, 1fr)
+    );
   }
 }
 
-@media (max-width: 680px) {
-  .dashboard {
-    gap: 24px;
-  }
-
-  .welcome-banner {
-    padding: 25px 20px;
-  }
-
-  .banner-decoration {
-    opacity: 0.45;
-  }
-
-  .dashboard-toolbar,
-  .section-heading {
-    align-items: flex-start;
-    flex-wrap: wrap;
-  }
-
+@media (max-width: 700px) {
   .goal-grid {
     grid-template-columns: 1fr;
   }
 
+  .welcome-banner {
+    min-height: 185px;
+    padding: 24px;
+  }
+
+  .banner-decoration {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
   .stats-grid {
     gap: 10px;
   }
@@ -1128,12 +1181,21 @@ onActivated(refresh);
     font-size: 27px;
   }
 
+  .goal-card {
+    padding: 19px;
+  }
+
   .commitments-panel {
-    padding: 3px 15px;
+    padding: 8px 15px;
   }
 
   .commitment-row {
     gap: 10px;
+  }
+
+  .commitment-marker {
+    flex-basis: 34px;
+    height: 34px;
   }
 }
 

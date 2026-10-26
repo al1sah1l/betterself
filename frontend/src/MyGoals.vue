@@ -11,6 +11,7 @@ import {
 import { api, ApiError } from "./api";
 import CreateGoal from "./CreateGoal.vue";
 import GoalDetail from "./GoalDetail.vue";
+import PriorityGoalPicker from "./PriorityGoalPicker.vue";
 
 const props = defineProps<{
   session: string;
@@ -24,22 +25,39 @@ type Goal = {
 };
 
 const goals = ref<Goal[]>([]);
+const priorityGoal = ref<string | null>(null);
+
 const loading = ref(false);
 const error = ref("");
+const priorityError = ref("");
+
 const selectedGoal = ref("");
 const showCreateGoal = ref(false);
 const search = ref("");
 
+const savingPriority = ref("");
+const priorityPickerKey = ref(0);
+
 const filteredGoals = computed(() => {
-  const query = search.value.trim().toLowerCase();
+  const query = search.value
+    .trim()
+    .toLowerCase();
 
-  if (!query) return goals.value;
-
-  return goals.value.filter(
+  const matching = goals.value.filter(
     (goal) =>
-      goal.outcome.toLowerCase().includes(query) ||
-      (goal.timeline ?? "").toLowerCase().includes(query),
+      goal.outcome
+        .toLowerCase()
+        .includes(query) ||
+      (goal.timeline ?? "")
+        .toLowerCase()
+        .includes(query),
   );
+
+  return matching.sort((a, b) => {
+    if (a.goal === priorityGoal.value) return -1;
+    if (b.goal === priorityGoal.value) return 1;
+    return 0;
+  });
 });
 
 async function loadGoals() {
@@ -49,12 +67,21 @@ async function loadGoals() {
   error.value = "";
 
   try {
-    const result = await api<{ goals: Goal[] }>(
-      "/dashboard/goals",
-      { session: props.session },
-    );
+    const [goalResponse, priorityResponse] =
+      await Promise.all([
+        api<{ goals: Goal[] }>(
+          "/dashboard/goals",
+          { session: props.session },
+        ),
 
-    goals.value = result.goals ?? [];
+        api<{ goal: string | null }>(
+          "/goals/priority",
+          { session: props.session },
+        ),
+      ]);
+
+    goals.value = goalResponse.goals ?? [];
+    priorityGoal.value = priorityResponse.goal;
   } catch (cause) {
     error.value =
       cause instanceof ApiError &&
@@ -66,17 +93,56 @@ async function loadGoals() {
   }
 }
 
+function priorityChanged(
+  goal: string | null,
+) {
+  priorityGoal.value = goal;
+}
+
+async function makePriority(goal: string) {
+  if (savingPriority.value) return;
+
+  savingPriority.value = goal;
+  priorityError.value = "";
+
+  try {
+    const result = await api<{
+      goal: string | null;
+    }>("/goals/set-priority", {
+      session: props.session,
+      goal,
+    });
+
+    priorityGoal.value = result.goal;
+
+    // Reload the separate picker so it reflects
+    // a priority changed directly from a card.
+    priorityPickerKey.value += 1;
+  } catch (cause) {
+    priorityError.value =
+      cause instanceof ApiError &&
+      cause.code === "UNAUTHORIZED"
+        ? "Your session expired. Please sign in again."
+        : "Could not update your priority. Please try again.";
+  } finally {
+    savingPriority.value = "";
+  }
+}
+
 async function goalCreated() {
   showCreateGoal.value = false;
   search.value = "";
   await loadGoals();
+  priorityPickerKey.value += 1;
 }
 
 async function goalDeleted() {
   selectedGoal.value = "";
   search.value = "";
   showCreateGoal.value = false;
+
   await loadGoals();
+  priorityPickerKey.value += 1;
 }
 
 function openGoal(goal: string) {
@@ -86,16 +152,13 @@ function openGoal(goal: string) {
 function backToGoals() {
   selectedGoal.value = "";
   void loadGoals();
+  priorityPickerKey.value += 1;
 }
 
 watch(
   () => props.requestedGoal,
   (goal) => {
-    if (goal) {
-      selectedGoal.value = goal;
-    } else {
-      selectedGoal.value = "";
-    }
+    selectedGoal.value = goal ?? "";
   },
   { immediate: true },
 );
@@ -105,17 +168,21 @@ onMounted(loadGoals);
 onActivated(() => {
   if (!selectedGoal.value) {
     void loadGoals();
+    priorityPickerKey.value += 1;
   }
 });
 </script>
 
 <template>
-  <section class="goals-page" aria-label="Goals">
+  <section
+    class="goals-page"
+    aria-label="Goals"
+  >
     <template v-if="selectedGoal">
       <div class="detail-toolbar">
         <button
-          class="back-button"
           type="button"
+          class="back-button"
           @click="backToGoals"
         >
           <span aria-hidden="true">←</span>
@@ -144,12 +211,18 @@ onActivated(() => {
 
           <h1>
             My goals
-            <span class="heading-sparkle">✦</span>
+            <span
+              class="heading-sparkle"
+              aria-hidden="true"
+            >
+              ✦
+            </span>
           </h1>
 
           <p class="intro">
-            A home for the things you want to achieve.
-            Every goal starts with a single step.
+            A home for the things you want to
+            achieve. Every goal starts with
+            a single step.
           </p>
         </div>
 
@@ -158,15 +231,29 @@ onActivated(() => {
           type="button"
           :aria-expanded="showCreateGoal"
           aria-controls="create-goal-panel"
-          @click="showCreateGoal = !showCreateGoal"
+          @click="
+            showCreateGoal = !showCreateGoal
+          "
         >
           <span aria-hidden="true">
             {{ showCreateGoal ? "×" : "+" }}
           </span>
 
-          {{ showCreateGoal ? "Close form" : "New goal" }}
+          {{
+            showCreateGoal
+              ? "Close form"
+              : "New goal"
+          }}
         </button>
       </header>
+
+      <PriorityGoalPicker
+        v-if="goals.length"
+        :key="priorityPickerKey"
+        :session="session"
+        class="goals-priority-picker"
+        @changed="priorityChanged"
+      />
 
       <div
         v-if="showCreateGoal"
@@ -186,7 +273,9 @@ onActivated(() => {
             type="button"
             class="close-form"
             aria-label="Close create goal form"
-            @click="showCreateGoal = false"
+            @click="
+              showCreateGoal = false
+            "
           >
             ×
           </button>
@@ -200,7 +289,10 @@ onActivated(() => {
 
       <div class="goals-toolbar">
         <div class="goals-count">
-          <span class="count-icon" aria-hidden="true">
+          <span
+            class="count-icon"
+            aria-hidden="true"
+          >
             ◎
           </span>
 
@@ -209,7 +301,11 @@ onActivated(() => {
 
             <p>
               {{ goals.length }}
-              {{ goals.length === 1 ? "goal" : "goals" }}
+              {{
+                goals.length === 1
+                  ? "goal"
+                  : "goals"
+              }}
               in your workspace
             </p>
           </div>
@@ -217,7 +313,10 @@ onActivated(() => {
 
         <div class="toolbar-actions">
           <label class="search-box">
-            <span class="search-icon" aria-hidden="true">
+            <span
+              class="search-icon"
+              aria-hidden="true"
+            >
               ⌕
             </span>
 
@@ -238,26 +337,38 @@ onActivated(() => {
             :disabled="loading"
             @click="loadGoals"
           >
-            {{ loading ? "Loading..." : "↻ Refresh" }}
+            {{
+              loading
+                ? "Loading..."
+                : "↻ Refresh"
+            }}
           </button>
         </div>
       </div>
 
       <p
         v-if="error"
-        class="error"
+        class="error-message"
         role="alert"
       >
         {{ error }}
       </p>
 
       <p
+        v-if="priorityError"
+        class="error-message"
+        role="alert"
+      >
+        {{ priorityError }}
+      </p>
+
+      <div
         v-if="loading && !goals.length"
         class="loading-message"
         role="status"
       >
         Loading your goals...
-      </p>
+      </div>
 
       <div
         v-else-if="!goals.length && !error"
@@ -275,9 +386,9 @@ onActivated(() => {
         </h2>
 
         <p>
-          Create a goal and BetterSelf will help you
-          turn it into a strategy, commitments,
-          and measurable actions.
+          Create a goal and BetterSelf will
+          help you turn it into a strategy,
+          commitments, and measurable actions.
         </p>
 
         <button
@@ -290,13 +401,17 @@ onActivated(() => {
       </div>
 
       <div
-        v-else-if="filteredGoals.length === 0 && !error"
+        v-else-if="
+          filteredGoals.length === 0 &&
+          !error
+        "
         class="empty-search"
       >
         <h2>No matching goals</h2>
 
         <p>
-          Try another keyword or clear your search.
+          Try another keyword or clear
+          your search.
         </p>
 
         <button
@@ -316,17 +431,35 @@ onActivated(() => {
           v-for="(goal, index) in filteredGoals"
           :key="goal.goal"
           class="goal-card"
+          :class="{
+            'goal-card--priority':
+              goal.goal === priorityGoal,
+          }"
         >
           <div class="goal-card-top">
-            <span class="goal-number">
-              GOAL {{ String(index + 1).padStart(2, "0") }}
+            <span
+              class="goal-number"
+              :class="{
+                'goal-number--priority':
+                  goal.goal === priorityGoal,
+              }"
+            >
+              {{
+                goal.goal === priorityGoal
+                  ? "★ CURRENT PRIORITY"
+                  : `GOAL ${String(index + 1).padStart(2, "0")}`
+              }}
             </span>
 
             <span
               class="goal-card-icon"
               aria-hidden="true"
             >
-              ✧
+              {{
+                goal.goal === priorityGoal
+                  ? "★"
+                  : "✧"
+              }}
             </span>
           </div>
 
@@ -337,31 +470,71 @@ onActivated(() => {
               v-if="goal.timeline"
               class="goal-timeline"
             >
-              <span aria-hidden="true">◷</span>
+              <span aria-hidden="true">
+                ◷
+              </span>
               {{ goal.timeline }}
             </p>
 
-            <p v-else class="goal-timeline">
+            <p
+              v-else
+              class="goal-timeline"
+            >
               Your journey, at your pace.
             </p>
           </div>
 
           <button
-            class="goal-open"
+            v-if="
+              goal.goal !== priorityGoal
+            "
             type="button"
-            :aria-label="`Open goal: ${goal.outcome}`"
-            @click="openGoal(goal.goal)"
+            class="set-priority-button"
+            :disabled="
+              Boolean(savingPriority)
+            "
+            @click="
+              makePriority(goal.goal)
+            "
+          >
+            {{
+              savingPriority === goal.goal
+                ? "Saving..."
+                : "☆ Make priority"
+            }}
+          </button>
+
+          <div
+            v-else
+            class="priority-confirmation"
+          >
+            ★ Your main focus right now
+          </div>
+
+          <button
+            type="button"
+            class="goal-open"
+            :aria-label="
+              `Open goal: ${goal.outcome}`
+            "
+            @click="
+              openGoal(goal.goal)
+            "
           >
             Explore goal
 
-            <span aria-hidden="true">↗</span>
+            <span aria-hidden="true">
+              ↗
+            </span>
           </button>
         </article>
 
         <button
           type="button"
           class="add-goal-card"
-          @click="showCreateGoal = true"
+          @click="
+            showCreateGoal = true
+          "
         >
           <span
             class="add-goal-icon"
@@ -393,7 +566,7 @@ onActivated(() => {
   justify-content: space-between;
   align-items: center;
   gap: 24px;
-  margin-bottom: 32px;
+  margin-bottom: 26px;
 }
 
 .eyebrow {
@@ -430,15 +603,20 @@ onActivated(() => {
   align-items: center;
   justify-content: center;
   gap: 10px;
+  padding: 13px 19px;
   border: 0;
   border-radius: 12px;
-  padding: 13px 19px;
   background: var(--accent);
   color: white;
   font-size: 14px;
   font-weight: 750;
   cursor: pointer;
-  box-shadow: 0 5px 15px rgba(115, 84, 197, 0.13);
+  box-shadow: 0 5px 15px rgba(
+    115,
+    84,
+    197,
+    0.13
+  );
 }
 
 .create-button:hover {
@@ -450,19 +628,28 @@ onActivated(() => {
   line-height: 1;
 }
 
+.goals-priority-picker {
+  margin-bottom: 28px;
+}
+
 .create-goal-panel {
   margin-bottom: 30px;
   padding: 26px;
   border: 1px solid #dcd2ef;
   border-radius: 20px;
   background: white;
-  box-shadow: 0 12px 30px rgba(75, 50, 135, 0.06);
+  box-shadow: 0 12px 30px rgba(
+    75,
+    50,
+    135,
+    0.06
+  );
 }
 
 .form-heading {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: flex-start;
   margin-bottom: 22px;
 }
 
@@ -499,9 +686,9 @@ onActivated(() => {
   place-items: center;
   width: 45px;
   height: 45px;
+  border-radius: 13px;
   background: #eee7fb;
   color: var(--accent);
-  border-radius: 13px;
   font-size: 27px;
 }
 
@@ -527,9 +714,9 @@ onActivated(() => {
   align-items: center;
   gap: 8px;
   padding: 0 13px;
-  background: white;
   border: 1px solid var(--border);
   border-radius: 10px;
+  background: white;
 }
 
 .search-icon {
@@ -548,9 +735,9 @@ onActivated(() => {
 }
 
 .refresh-button {
+  padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 11px 14px;
   background: white;
   color: var(--accent);
   font-weight: 700;
@@ -558,9 +745,16 @@ onActivated(() => {
   cursor: pointer;
 }
 
+.refresh-button:disabled {
+  opacity: 0.6;
+}
+
 .goals-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(
+    2,
+    minmax(0, 1fr)
+  );
   gap: 18px;
 }
 
@@ -583,13 +777,34 @@ onActivated(() => {
 .goal-card:hover {
   transform: translateY(-3px);
   border-color: #bca8e9;
-  box-shadow: 0 12px 30px rgba(75, 50, 135, 0.08);
+  box-shadow: 0 12px 30px rgba(
+    75,
+    50,
+    135,
+    0.08
+  );
+}
+
+.goal-card--priority {
+  border: 2px solid #7951cb;
+  background: linear-gradient(
+    145deg,
+    #fff 55%,
+    #f7f1ff 100%
+  );
+  box-shadow: 0 10px 28px rgba(
+    105,
+    65,
+    180,
+    0.11
+  );
 }
 
 .goal-card-top {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .goal-number {
@@ -602,9 +817,18 @@ onActivated(() => {
   letter-spacing: 0.09em;
 }
 
+.goal-number--priority {
+  background: #7354c5;
+  color: white;
+}
+
 .goal-card-icon {
   color: #b49be6;
   font-size: 27px;
+}
+
+.goal-card--priority .goal-card-icon {
+  color: #7354c5;
 }
 
 .goal-card-body {
@@ -626,6 +850,36 @@ onActivated(() => {
   line-height: 1.5;
 }
 
+.set-priority-button {
+  align-self: flex-start;
+  min-height: 38px;
+  padding: 9px 12px;
+  margin-bottom: 12px;
+  border: 1px solid #d6c5f0;
+  border-radius: 9px;
+  background: #f8f4ff;
+  color: #7150bf;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.set-priority-button:hover:not(:disabled) {
+  background: #eee5ff;
+}
+
+.set-priority-button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.priority-confirmation {
+  margin-bottom: 12px;
+  color: #6743b8;
+  font-size: 12px;
+  font-weight: 750;
+}
+
 .goal-open {
   display: flex;
   align-items: center;
@@ -643,6 +897,15 @@ onActivated(() => {
 
 .goal-open:hover {
   background: #e6dafa;
+}
+
+.goal-card--priority .goal-open {
+  background: #7354c5;
+  color: white;
+}
+
+.goal-card--priority .goal-open:hover {
+  background: #6041b1;
 }
 
 .add-goal-card {
@@ -697,9 +960,9 @@ onActivated(() => {
   display: inline-flex;
   align-items: center;
   gap: 9px;
+  padding: 10px 15px;
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 10px 15px;
   background: white;
   color: var(--accent);
   font-size: 13px;
@@ -744,6 +1007,15 @@ onActivated(() => {
   line-height: 1.7;
 }
 
+.error-message {
+  padding: 12px 15px;
+  border: 1px solid #efc3ca;
+  border-radius: 10px;
+  background: #fff3f5;
+  color: #a32939;
+  font-size: 12px;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -777,6 +1049,10 @@ onActivated(() => {
 
   .create-goal-panel {
     padding: 18px;
+  }
+
+  .goal-card {
+    padding: 19px;
   }
 }
 

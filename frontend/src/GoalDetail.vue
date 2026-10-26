@@ -1,14 +1,23 @@
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import {
+  computed,
+  onMounted,
+  ref,
+  watch,
+  nextTick,
+} from "vue";
+
+import { api } from "./api";
 
 import GoalDetailContent from "./GoalDetailContent.vue";
 import ObservedResults from "./ObservedResults.vue";
 import PlanControls from "./PlanControls.vue";
 import ProgressReview from "./ProgressReview.vue";
 import ProgressOverview from "./ProgressOverview.vue";
+import PriorityGoalPicker from "./PriorityGoalPicker.vue";
 
-defineProps<{
+const props = defineProps<{
   session: string;
   goal: string;
 }>();
@@ -18,6 +27,21 @@ const emit = defineEmits<{
 }>();
 
 type Section = "plan" | "results" | "review";
+
+type Commitment = {
+  commitment: string;
+  description: string;
+  active: boolean;
+  recurring: boolean;
+  proofs: { proof: string }[];
+};
+
+type GoalDetailData = {
+  outcome: string;
+  timeline: string;
+  successDefinition: string;
+  commitments: Commitment[];
+};
 
 const sections = [
   {
@@ -41,19 +65,51 @@ const sections = [
 ] as const;
 
 const activeSection = ref<Section>("plan");
+
 const revision = ref(0);
 const progressRevision = ref(0);
+const overview = ref<GoalDetailData | null>(null);
+
+const selectedCommitment = ref("");
+const showProofPicker = ref(false);
+const proofMessage = ref("");
 
 const activeDescription = computed(() => {
   switch (activeSection.value) {
     case "plan":
-      return "Build your strategy, take action, and prove the work you've done.";
+      return "Turn your strategy into concrete action.";
     case "results":
-      return "Capture what actually changed, not just the tasks you completed.";
+      return "Record what has changed in the real world.";
     case "review":
-      return "Learn from your execution and results, then decide what to improve.";
+      return "Reflect on your progress and adapt.";
   }
 });
+
+const availableForProof = computed(() =>
+  (overview.value?.commitments ?? []).filter(
+    (item) =>
+      item.active &&
+      (
+        item.recurring ||
+        (item.proofs?.length ?? 0) === 0
+      ),
+  ),
+);
+
+async function loadOverview() {
+  try {
+    const result = await api<{
+      detail: GoalDetailData;
+    }>("/dashboard/goal", {
+      session: props.session,
+      goal: props.goal,
+    });
+
+    overview.value = result.detail;
+  } catch {
+    overview.value = null;
+  }
+}
 
 function selectSection(section: Section) {
   if (activeSection.value !== section) {
@@ -65,17 +121,93 @@ function selectSection(section: Section) {
 function planSaved() {
   revision.value += 1;
   progressRevision.value += 1;
+  void loadOverview();
 }
 
 function reviewSaved() {
   revision.value += 1;
   progressRevision.value += 1;
   activeSection.value = "plan";
+  void loadOverview();
 }
 
 function goalDeleted() {
   emit("deleted");
 }
+
+function openProofPicker() {
+  proofMessage.value = "";
+  showProofPicker.value = true;
+  activeSection.value = "plan";
+  void loadOverview();
+}
+
+async function jumpToProof() {
+  if (!selectedCommitment.value) {
+    proofMessage.value =
+      "Choose the commitment you want to prove.";
+    return;
+  }
+
+  activeSection.value = "plan";
+  proofMessage.value = "";
+
+  await nextTick();
+
+  const card = document.getElementById(
+    `commitment-${selectedCommitment.value}`,
+  );
+
+  if (!card) {
+    proofMessage.value =
+      "Commitment is not visible. Choose All in the commitment filters and try again.";
+    return;
+  }
+
+  const details = card.querySelector<HTMLDetailsElement>(
+    "details.proof-submission",
+  );
+
+  if (!details) {
+    proofMessage.value =
+      "Proof submission is unavailable for this commitment.";
+    return;
+  }
+
+  details.open = true;
+
+  card.scrollIntoView({
+    behavior: window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches
+      ? "instant"
+      : "smooth",
+    block: "center",
+  });
+
+  showProofPicker.value = false;
+
+  await nextTick();
+
+  const firstField = details.querySelector<
+    HTMLInputElement | HTMLTextAreaElement
+  >("textarea, input:not([type=hidden])");
+
+  firstField?.focus({ preventScroll: true });
+}
+
+watch(
+  () => [props.session, props.goal],
+  () => {
+    selectedCommitment.value = "";
+    showProofPicker.value = false;
+    activeSection.value = "plan";
+    overview.value = null;
+    void loadOverview();
+  },
+);
+
+onMounted(loadOverview);
 </script>
 
 <template>
@@ -87,20 +219,38 @@ function goalDeleted() {
         </p>
 
         <h1>
-          Every step brings you
-          <span>closer.</span>
-          <span
-            class="workspace-sparkle"
-            aria-hidden="true"
-          >
-            ✦
-          </span>
+          {{
+            overview?.outcome ||
+            "Your next big step"
+          }}
         </h1>
 
-        <p>
-          Your strategy, commitments, and real-world
-          progress — all in one place.
+        <p class="intro-description">
+          {{
+            overview?.timeline
+              ? `Target: ${overview.timeline}`
+              : "Your goal, your strategy, your progress."
+          }}
         </p>
+
+        <div class="hero-actions">
+          <button
+            type="button"
+            class="hero-primary"
+            @click="openProofPicker"
+          >
+            Submit proof
+            <span aria-hidden="true">↗</span>
+          </button>
+
+          <button
+            type="button"
+            class="hero-secondary"
+            @click="selectSection('results')"
+          >
+            Record results
+          </button>
+        </div>
       </div>
 
       <div
@@ -111,6 +261,86 @@ function goalDeleted() {
         <span>✦</span>
       </div>
     </header>
+
+    <PriorityGoalPicker
+      :session="session"
+      :current-goal="goal"
+      class="priority-section"
+    />
+
+    <section
+      v-if="showProofPicker"
+      class="quick-proof"
+      aria-label="Quick proof submission"
+    >
+      <div class="quick-proof-heading">
+        <div>
+          <h2>What did you accomplish?</h2>
+          <p>
+            Choose a commitment, and we'll take you
+            directly to its proof form.
+          </p>
+        </div>
+
+        <button
+          class="close-quick-proof"
+          type="button"
+          aria-label="Close proof shortcut"
+          @click="showProofPicker = false"
+        >
+          ×
+        </button>
+      </div>
+
+      <div
+        v-if="availableForProof.length"
+        class="quick-proof-controls"
+      >
+        <label for="quick-proof-commitment">
+          Commitment
+        </label>
+
+        <select
+          id="quick-proof-commitment"
+          v-model="selectedCommitment"
+        >
+          <option disabled value="">
+            Select a commitment
+          </option>
+
+          <option
+            v-for="item in availableForProof"
+            :key="item.commitment"
+            :value="item.commitment"
+          >
+            {{ item.description }}
+          </option>
+        </select>
+
+        <button
+          type="button"
+          class="quick-proof-button"
+          :disabled="!selectedCommitment"
+          @click="jumpToProof"
+        >
+          Continue to proof →
+        </button>
+      </div>
+
+      <p v-else class="quick-proof-empty">
+        No commitments are currently available
+        for a new proof. Add a commitment or review
+        your existing submissions below.
+      </p>
+
+      <p
+        v-if="proofMessage"
+        class="quick-proof-error"
+        role="alert"
+      >
+        {{ proofMessage }}
+      </p>
+    </section>
 
     <ProgressOverview
       :session="session"
@@ -173,14 +403,12 @@ function goalDeleted() {
             activeSection === "plan"
               ? "Your action plan"
               : activeSection === "results"
-                ? "Your observed results"
-                : "Your progress review"
+                ? "Observed results"
+                : "Progress review"
           }}
         </h2>
 
-        <p>
-          {{ activeDescription }}
-        </p>
+        <p>{{ activeDescription }}</p>
       </div>
     </div>
 
@@ -189,18 +417,18 @@ function goalDeleted() {
       class="workspace-panel"
       aria-label="Goal plan"
     >
+      <GoalDetailContent
+        :key="`detail-${session}-${goal}-${revision}`"
+        :session="session"
+        :goal="goal"
+      />
+
       <PlanControls
         :key="`plan-${session}-${goal}`"
         :session="session"
         :goal="goal"
         @saved="planSaved"
         @deleted="goalDeleted"
-      />
-
-      <GoalDetailContent
-        :key="`detail-${session}-${goal}-${revision}`"
-        :session="session"
-        :goal="goal"
       />
     </section>
 
@@ -266,7 +494,8 @@ function goalDeleted() {
 .workspace-intro-content {
   position: relative;
   z-index: 1;
-  max-width: 620px;
+  max-width: 750px;
+  min-width: 0;
 }
 
 .workspace-eyebrow {
@@ -280,26 +509,49 @@ function goalDeleted() {
 .workspace-intro h1 {
   margin: 0;
   color: white;
-  font-size: clamp(25px, 3vw, 35px);
+  font-size: clamp(25px, 3vw, 36px);
   line-height: 1.25;
-  letter-spacing: -0.045em;
+  letter-spacing: -0.04em;
+  overflow-wrap: anywhere;
 }
 
-.workspace-intro h1 > span:first-child {
-  color: #f5e5ff;
-}
-
-.workspace-sparkle {
-  margin-left: 8px;
-  color: #e8d0ff;
-  font-size: 25px;
-}
-
-.workspace-intro-content > p:last-child {
+.intro-description {
   margin: 12px 0 0;
   color: #f4edff;
   font-size: 13px;
-  line-height: 1.65;
+  line-height: 1.6;
+}
+
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.hero-primary,
+.hero-secondary {
+  min-height: 42px;
+  padding: 11px 16px;
+  border-radius: 10px;
+  color: white;
+  font-size: 13px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.hero-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  border: 0;
+  background: #fff;
+  color: #6844b8;
+}
+
+.hero-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .workspace-intro-art {
@@ -311,9 +563,8 @@ function goalDeleted() {
 
 .workspace-intro-art span:first-child {
   position: absolute;
-  top: 12px;
+  top: 10px;
   right: 45px;
-  color: white;
   font-size: 125px;
   opacity: 0.15;
 }
@@ -322,14 +573,108 @@ function goalDeleted() {
   position: absolute;
   right: 180px;
   bottom: -55px;
-  color: white;
   font-size: 135px;
   opacity: 0.12;
 }
 
+.priority-section {
+  margin-top: 18px;
+}
+
+.quick-proof {
+  margin-top: 18px;
+  padding: 23px;
+  border: 1px solid #dac9f1;
+  border-radius: 17px;
+  background: #faf7ff;
+}
+
+.quick-proof-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.quick-proof h2 {
+  margin: 0;
+  font-size: 19px;
+  letter-spacing: -0.025em;
+}
+
+.quick-proof-heading p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.close-quick-proof {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 25px;
+  cursor: pointer;
+}
+
+.quick-proof-controls {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.quick-proof-controls label {
+  flex: 0 0 100%;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.quick-proof-controls select {
+  flex: 1;
+  min-width: 200px;
+  min-height: 43px;
+  padding: 10px;
+  border: 1px solid #d6c8eb;
+  border-radius: 10px;
+  background: white;
+  color: var(--text);
+}
+
+.quick-proof-button {
+  min-height: 43px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #7354c5;
+  color: white;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.quick-proof-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.quick-proof-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quick-proof-error {
+  color: #a32939;
+  font-size: 12px;
+}
+
 .workspace-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(
+    3,
+    minmax(0, 1fr)
+  );
   gap: 12px;
   margin-top: 30px;
 }
@@ -346,14 +691,9 @@ function goalDeleted() {
   color: var(--text);
   text-align: left;
   cursor: pointer;
-  transition:
-    transform 0.2s,
-    border-color 0.2s,
-    box-shadow 0.2s;
 }
 
 .workspace-tab:hover {
-  transform: translateY(-2px);
   border-color: #bba6e9;
 }
 
@@ -361,7 +701,8 @@ function goalDeleted() {
   border-color: var(--accent);
   background: var(--accent);
   color: white;
-  box-shadow: 0 7px 22px rgba(115, 84, 197, 0.17);
+  box-shadow:
+    0 7px 22px rgba(115, 84, 197, 0.17);
 }
 
 .tab-number {
@@ -415,10 +756,7 @@ function goalDeleted() {
 }
 
 .workspace-section-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  margin: 38px 0 8px;
+  margin: 32px 0 12px;
 }
 
 .workspace-section-eyebrow {
@@ -436,7 +774,6 @@ function goalDeleted() {
 }
 
 .workspace-section-heading > div > p:last-child {
-  max-width: 650px;
   margin: 9px 0 0;
   color: var(--muted);
   font-size: 13px;
@@ -508,14 +845,18 @@ function goalDeleted() {
     display: none;
   }
 
-  .workspace-section-heading {
-    margin-top: 30px;
+  .quick-proof {
+    padding: 16px;
   }
-}
 
-@media (prefers-reduced-motion: reduce) {
-  .workspace-tab {
-    transition: none;
+  .quick-proof-controls select,
+  .quick-proof-button {
+    flex: 0 0 100%;
+    width: 100%;
+  }
+
+  .workspace-section-heading {
+    margin-top: 25px;
   }
 }
 </style>

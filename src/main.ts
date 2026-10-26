@@ -26,8 +26,8 @@ import {
 } from "./http/goal-operation-lock.ts";
 
 import {
-  cleanupOrphanImages,
-} from "./http/orphan-image-cleanup.ts";
+  handlePriorityGoalRequest,
+} from "./http/priority-goal.ts";
 
 const application = assembleApplication();
 
@@ -35,101 +35,100 @@ const gateway = createGateway({
   application,
 });
 
-// Keep a reference to the original Sync Engine
-// invocation before applying our HTTP safeguards.
 const invokeGateway =
   gateway.invoke.bind(gateway);
 
-const invokeWithValidation: typeof gateway.invoke = async (
-  path,
-  input,
-  options,
-) => {
-  if (
-    path === "/proofs/submit" ||
-    path === "/proofs/resubmit"
-  ) {
-    const payload = input as {
-      session?: unknown;
-      evidence?: unknown;
-    };
+const invokeWithValidation: typeof gateway.invoke =
+  async (path, input, options) => {
+    if (
+      path === "/proofs/submit" ||
+      path === "/proofs/resubmit"
+    ) {
+      const payload = input as {
+        session?: unknown;
+        evidence?: unknown;
+      };
 
-    const owned = await imageEvidenceIsOwned(
-      (target, body) =>
-        invokeGateway(target, body),
-      payload?.session,
-      payload?.evidence,
-    );
+      const owned = await imageEvidenceIsOwned(
+        (target, body) =>
+          invokeGateway(target, body),
+        payload?.session,
+        payload?.evidence,
+      );
 
-    if (!owned) {
+      if (!owned) {
+        return {
+          ok: false,
+          error: {
+            kind: "domain",
+            value: "FORBIDDEN",
+          },
+        };
+      }
+    }
+
+    if (path !== "/proofs/submit") {
+      return invokeGateway(
+        path,
+        input,
+        options,
+      );
+    }
+
+    if (
+      typeof input !== "object" ||
+      input === null ||
+      !("occurrence" in input) ||
+      typeof input.occurrence !== "string"
+    ) {
       return {
         ok: false,
         error: {
           kind: "domain",
-          value: "FORBIDDEN",
+          value: "INVALID_OCCURRENCE",
         },
       };
     }
-  }
 
-  if (path !== "/proofs/submit") {
-    return invokeGateway(
+    const occurrence = new Date(
+      input.occurrence,
+    );
+
+    if (
+      !Number.isFinite(occurrence.getTime()) ||
+      occurrence.toISOString() !==
+        input.occurrence
+    ) {
+      return {
+        ok: false,
+        error: {
+          kind: "domain",
+          value: "INVALID_OCCURRENCE",
+        },
+      };
+    }
+
+    const result = await invokeGateway(
       path,
-      input,
+      {
+        ...input,
+        occurrence,
+      },
       options,
     );
-  }
 
-  if (
-    typeof input !== "object" ||
-    input === null ||
-    !("occurrence" in input) ||
-    typeof input.occurrence !== "string"
-  ) {
-    return {
-      ok: false,
-      error: {
-        kind: "domain",
-        value: "INVALID_OCCURRENCE",
-      },
-    };
-  }
+    if (result.ok) {
+      await gateway.whenIdle();
+    }
 
-  const occurrence = new Date(
-    input.occurrence,
-  );
+    return result;
+  };
 
-  if (
-    !Number.isFinite(occurrence.getTime()) ||
-    occurrence.toISOString() !==
-      input.occurrence
-  ) {
-    return {
-      ok: false,
-      error: {
-        kind: "domain",
-        value: "INVALID_OCCURRENCE",
-      },
-    };
-  }
-
-  const result = await invokeGateway(
-    path,
-    {
-      ...input,
-      occurrence,
-    },
-    options,
-  );
-
-  if (result.ok) {
-    await gateway.whenIdle();
-  }
-
-  return result;
-};
-
-gateway.invoke = async (path, input, options) => {
+gateway.invoke = async (
+  path,
+  input,
+  options,
+) => {
   const missingGoal = () => ({
     ok: false as const,
     error: {
@@ -146,7 +145,10 @@ gateway.invoke = async (path, input, options) => {
     },
   });
 
-  const goal = guardedGoalId(path, input);
+  const goal = guardedGoalId(
+    path,
+    input,
+  );
 
   if (goal) {
     return withExistingGoal(
@@ -175,11 +177,15 @@ gateway.invoke = async (path, input, options) => {
       proof?: unknown;
     } | null;
 
-    const proofId = path === "/proofs/resubmit"
-      ? payload?.previousProof
-      : payload?.proof;
+    const proofId =
+      path === "/proofs/resubmit"
+        ? payload?.previousProof
+        : payload?.proof;
 
-    if (typeof proofId !== "string" || !proofId) {
+    if (
+      typeof proofId !== "string" ||
+      !proofId
+    ) {
       return invokeWithValidation(
         path,
         input,
@@ -313,9 +319,6 @@ async function recoverImageCleanup(): Promise<void> {
       "[startup] Could not recover image cleanup:",
       error,
     );
-
-    // Startup may continue. Failed jobs remain
-    // in MongoDB for later recovery.
   }
 }
 
@@ -332,7 +335,10 @@ async function checkProductionMongoDB(): Promise<void> {
       primary: info.isWritablePrimary ?? false,
       mongos: info.msg === "isdbgrid",
       transactionsSupported:
-        Boolean(info.setName || info.msg === "isdbgrid"),
+        Boolean(
+          info.setName ||
+          info.msg === "isdbgrid",
+        ),
     });
   } catch (error) {
     console.error(
@@ -344,37 +350,9 @@ async function checkProductionMongoDB(): Promise<void> {
 
 await checkProductionMongoDB();
 
-async function runOrphanImageCleanup(): Promise<void> {
-  try {
-    const result = await cleanupOrphanImages(db);
-
-    console.log(
-      `[image-cleanup] ` +
-      `${result.scanned} scanned, ` +
-      `${result.removed} removed, ` +
-      `${result.retained} retained, ` +
-      `${result.failed} failed`,
-    );
-  } catch (error) {
-    console.error(
-      "[image-cleanup] Maintenance failed:",
-      error,
-    );
-  }
-}
-
-// Run once at startup.
-await runOrphanImageCleanup();
-
-// Repeat daily while this server is running.
-const orphanCleanupInterval = setInterval(
-  () => {
-    void runOrphanImageCleanup();
-  },
-  24 * 60 * 60 * 1000,
-);
-
-orphanCleanupInterval.unref();
+// Automatic orphan-image cleanup is deliberately
+// disabled until the upload/submit race is resolved.
+// Durable goal-deletion cleanup recovery remains on.
 
 const server = Bun.serve({
   hostname: process.env.HOST ?? "127.0.0.1",
@@ -418,8 +396,17 @@ const server = Bun.serve({
     }
 
     if (
-      path.startsWith("/api/images/")
+      path === "/api/goals/priority" ||
+      path === "/api/goals/set-priority"
     ) {
+      return handlePriorityGoalRequest(
+        request,
+        (target, body) =>
+          invokeGateway(target, body),
+      );
+    }
+
+    if (path.startsWith("/api/images/")) {
       return handleImageRequest(
         request,
         (target, body) =>

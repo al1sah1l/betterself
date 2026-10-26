@@ -517,3 +517,11 @@
     transition: none;
   }
 }
+
+.goal-workspace .goal-detail > .goal-heading {
+  display: none;
+}
+
+.goal-workspace .plan-controls {
+  margin-top: 35px;
+}
