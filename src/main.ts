@@ -1,3 +1,4 @@
+
 import { createGateway } from "@mit-sdg/sync-engine/boundary";
 import { createHttpHandler } from "@mit-sdg/sync-engine-http/handler";
 import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
@@ -5,14 +6,58 @@ import { httpPolicy } from "@mit-sdg/sync-engine-http/policy";
 import { assembleApplication } from "./assembly.ts";
 import { db } from "./db.ts";
 import { serveFrontend } from "./http/frontend.ts";
+import {
+  handleImageRequest,
+  imageEvidenceIsOwned,
+} from "./http/images.ts";
 
 const application = assembleApplication();
-const gateway = createGateway({ application });
-const invokeGateway = gateway.invoke.bind(gateway);
 
-gateway.invoke = async (path, input, options) => {
+const gateway = createGateway({
+  application,
+});
+
+const invokeGateway =
+  gateway.invoke.bind(gateway);
+
+gateway.invoke = async (
+  path,
+  input,
+  options,
+) => {
+  if (
+    path === "/proofs/submit" ||
+    path === "/proofs/resubmit"
+  ) {
+    const payload = input as {
+      session?: unknown;
+      evidence?: unknown;
+    };
+
+    const owned = await imageEvidenceIsOwned(
+      (target, body) =>
+        invokeGateway(target, body),
+      payload?.session,
+      payload?.evidence,
+    );
+
+    if (!owned) {
+      return {
+        ok: false,
+        error: {
+          kind: "domain",
+          value: "FORBIDDEN",
+        },
+      };
+    }
+  }
+
   if (path !== "/proofs/submit") {
-    return invokeGateway(path, input, options);
+    return invokeGateway(
+      path,
+      input,
+      options,
+    );
   }
 
   if (
@@ -30,11 +75,14 @@ gateway.invoke = async (path, input, options) => {
     };
   }
 
-  const occurrence = new Date(input.occurrence);
+  const occurrence = new Date(
+    input.occurrence,
+  );
 
   if (
     !Number.isFinite(occurrence.getTime()) ||
-    occurrence.toISOString() !== input.occurrence
+    occurrence.toISOString() !==
+      input.occurrence
   ) {
     return {
       ok: false,
@@ -47,7 +95,10 @@ gateway.invoke = async (path, input, options) => {
 
   const result = await invokeGateway(
     path,
-    { ...input, occurrence },
+    {
+      ...input,
+      occurrence,
+    },
     options,
   );
 
@@ -119,10 +170,14 @@ const handler = createHttpHandler({
 
 const server = Bun.serve({
   hostname: process.env.HOST ?? "127.0.0.1",
-  port: Number(process.env.PORT ?? 3000),
+  port: Number(
+    process.env.PORT ?? 3000,
+  ),
 
   async fetch(request) {
-    const path = new URL(request.url).pathname;
+    const path = new URL(
+      request.url,
+    ).pathname;
 
     if (path === "/health") {
       try {
@@ -131,7 +186,9 @@ const server = Bun.serve({
           { timeoutMS: 3000 },
         );
 
-        return Response.json({ status: "ok" });
+        return Response.json({
+          status: "ok",
+        });
       } catch {
         return Response.json(
           { status: "unavailable" },
@@ -140,7 +197,20 @@ const server = Bun.serve({
       }
     }
 
-    if (path === "/api" || path.startsWith("/api/")) {
+    if (
+      path.startsWith("/api/images/")
+    ) {
+      return handleImageRequest(
+        request,
+        (target, body) =>
+          invokeGateway(target, body),
+      );
+    }
+
+    if (
+      path === "/api" ||
+      path.startsWith("/api/")
+    ) {
       return handler(request);
     }
 
@@ -148,4 +218,6 @@ const server = Bun.serve({
   },
 });
 
-console.log(`BetterSelf listening on ${server.url}`);
+console.log(
+  `BetterSelf listening on ${server.url}`,
+);

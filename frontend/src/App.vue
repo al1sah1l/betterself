@@ -1,14 +1,23 @@
+
 <script setup lang="ts">
 import { ref } from "vue";
 import { api, ApiError } from "./api";
 import MyGoals from "./MyGoals.vue";
 import MyGroups from "./MyGroups.vue";
+import Dashboard from "./Dashboard.vue";
+import AllCommitments from "./AllCommitments.vue";
 
 type AuthResponse = {
   account: string;
   session: string;
   expiresAt: string;
 };
+
+type Page =
+  | "dashboard"
+  | "goals"
+  | "commitments"
+  | "groups";
 
 const mode = ref<"sign-in" | "register">("sign-in");
 const username = ref("");
@@ -17,7 +26,30 @@ const account = ref("");
 const session = ref("");
 const loading = ref(false);
 const error = ref("");
-const activePage = ref<"goals" | "groups">("goals");
+
+const activePage = ref<Page>("dashboard");
+const selectedGoalFromOverview = ref("");
+
+const pages: {
+  id: Page;
+  icon: string;
+  title: string;
+}[] = [
+  { id: "dashboard", icon: "◫", title: "Dashboard" },
+  { id: "goals", icon: "◎", title: "Goals" },
+  { id: "commitments", icon: "✓", title: "Commitments" },
+  { id: "groups", icon: "♧", title: "Groups" },
+];
+
+function navigate(page: Page) {
+  selectedGoalFromOverview.value = "";
+  activePage.value = page;
+}
+
+function openGoal(goal: string) {
+  selectedGoalFromOverview.value = goal;
+  activePage.value = "goals";
+}
 
 function errorMessage(cause: unknown): string {
   if (cause instanceof ApiError) {
@@ -42,7 +74,8 @@ function errorMessage(cause: unknown): string {
 }
 
 function switchMode() {
-  mode.value = mode.value === "sign-in" ? "register" : "sign-in";
+  mode.value =
+    mode.value === "sign-in" ? "register" : "sign-in";
   error.value = "";
   password.value = "";
 }
@@ -58,14 +91,22 @@ async function authenticate() {
   }
 
   if (mode.value === "register") {
-    if (!/^[A-Za-z0-9_-]{3,32}$/.test(username.value.trim())) {
+    if (
+      !/^[A-Za-z0-9_-]{3,32}$/.test(
+        username.value.trim(),
+      )
+    ) {
       error.value =
         "Username must contain 3–32 letters, numbers, underscores, or hyphens.";
       return;
     }
 
-    if (password.value.length < 8 || password.value.length > 128) {
-      error.value = "Password must contain 8–128 characters.";
+    if (
+      password.value.length < 8 ||
+      password.value.length > 128
+    ) {
+      error.value =
+        "Password must contain 8–128 characters.";
       return;
     }
   }
@@ -84,6 +125,8 @@ async function authenticate() {
     account.value = result.account;
     session.value = result.session;
     password.value = "";
+    activePage.value = "dashboard";
+    selectedGoalFromOverview.value = "";
   } catch (cause) {
     error.value = errorMessage(cause);
   } finally {
@@ -105,7 +148,10 @@ async function signOut() {
     account.value = "";
     session.value = "";
   } catch (cause) {
-    if (cause instanceof ApiError && cause.code === "UNAUTHORIZED") {
+    if (
+      cause instanceof ApiError &&
+      cause.code === "UNAUTHORIZED"
+    ) {
       account.value = "";
       session.value = "";
     } else {
@@ -118,13 +164,25 @@ async function signOut() {
 </script>
 
 <template>
-  <main class="auth-card" :class="{ 'signed-in': session }">
-    <div class="brand">BetterSelf</div>
-    <p class="tagline">Your goals, one commitment at a time.</p>
+  <main
+    class="auth-card"
+    :class="{ 'signed-in': session }"
+  >
+    <div v-if="!session" class="brand">
+      BetterSelf
+    </div>
+
+    <p v-if="!session" class="tagline">
+      Your goals, one commitment at a time.
+    </p>
 
     <template v-if="!session">
       <h1>
-        {{ mode === "sign-in" ? "Welcome back" : "Start your journey" }}
+        {{
+          mode === "sign-in"
+            ? "Welcome back"
+            : "Start your journey"
+        }}
       </h1>
 
       <p class="muted">
@@ -138,6 +196,7 @@ async function signOut() {
       <form @submit.prevent="authenticate">
         <fieldset :disabled="loading">
           <label for="username">Username</label>
+
           <input
             id="username"
             v-model="username"
@@ -146,21 +205,30 @@ async function signOut() {
           />
 
           <label for="password">Password</label>
+
           <input
             id="password"
             v-model="password"
             type="password"
             :autocomplete="
-              mode === 'sign-in' ? 'current-password' : 'new-password'
+              mode === 'sign-in'
+                ? 'current-password'
+                : 'new-password'
             "
             required
           />
 
-          <p v-if="mode === 'register'" class="muted">
+          <p
+            v-if="mode === 'register'"
+            class="muted"
+          >
             Password must contain 8–128 characters.
           </p>
 
-          <button class="primary" type="submit">
+          <button
+            class="primary"
+            type="submit"
+          >
             {{
               loading
                 ? "Please wait..."
@@ -187,61 +255,123 @@ async function signOut() {
     </template>
 
     <template v-else>
-      <header class="account-header">
-        <div>
-          <h1>Hello, {{ account }}!</h1>
-          <p class="muted">
-            You're signed in and ready to work on your goals.
+      <div class="app-shell">
+        <aside
+          class="app-sidebar"
+          aria-label="Workspace sidebar"
+        >
+          <div class="sidebar-brand">
+            BetterSelf
+          </div>
+
+          <p class="sidebar-subtitle">
+            Your goals, one commitment at a time.
+          </p>
+
+          <nav
+            class="sidebar-nav"
+            aria-label="Main navigation"
+          >
+            <button
+              v-for="page in pages"
+              :key="page.id"
+              type="button"
+              :aria-current="
+                activePage === page.id
+                  ? 'page'
+                  : undefined
+              "
+              @click="navigate(page.id)"
+            >
+              <span
+                class="nav-symbol"
+                aria-hidden="true"
+              >
+                {{ page.icon }}
+              </span>
+              {{ page.title }}
+            </button>
+          </nav>
+
+          <div class="sidebar-bottom">
+            <span class="signed-in-as">
+              Signed in as
+              <strong>{{ account }}</strong>
+            </span>
+
+            <button
+              type="button"
+              class="signout-button"
+              :disabled="loading"
+              @click="signOut"
+            >
+              {{
+                loading
+                  ? "Signing out…"
+                  : "Sign out"
+              }}
+            </button>
+          </div>
+        </aside>
+
+        <div class="workspace-main">
+          <div class="workspace-topbar">
+            <span class="workspace-topbar-brand">
+              BetterSelf
+            </span>
+            <span>{{ account }}</span>
+          </div>
+
+          <KeepAlive>
+            <Dashboard
+              v-if="activePage === 'dashboard'"
+              :key="`dashboard-${session}`"
+              :session="session"
+              :account="account"
+              @navigate="navigate"
+              @open-goal="openGoal"
+            />
+
+            <MyGoals
+              v-else-if="activePage === 'goals'"
+              :key="`goals-${session}`"
+              :session="session"
+              :requested-goal="selectedGoalFromOverview"
+            />
+
+            <AllCommitments
+              v-else-if="activePage === 'commitments'"
+              :key="`commitments-${session}`"
+              :session="session"
+              @open-goal="openGoal"
+            />
+
+            <MyGroups
+              v-else
+              :key="`groups-${session}`"
+              :session="session"
+              :account="account"
+            />
+          </KeepAlive>
+
+          <p
+            v-if="error"
+            class="error"
+            role="alert"
+          >
+            {{ error }}
           </p>
         </div>
-
-        <button
-          class="primary"
-          type="button"
-          :disabled="loading"
-          @click="signOut"
-        >
-          {{ loading ? "Signing out..." : "Sign out" }}
-        </button>
-      </header>
-
-      <nav class="page-nav" aria-label="Main navigation">
-        <button
-          class="text-button"
-          type="button"
-          :aria-current="activePage === 'goals' ? 'page' : undefined"
-          @click="activePage = 'goals'"
-        >
-          Goals
-        </button>
-
-        <button
-          class="text-button"
-          type="button"
-          :aria-current="activePage === 'groups' ? 'page' : undefined"
-          @click="activePage = 'groups'"
-        >
-          Groups
-        </button>
-      </nav>
-
-      <KeepAlive>
-        <MyGoals
-          v-if="activePage === 'goals'"
-          :key="`goals-${session}`"
-          :session="session"
-        />
-
-        <MyGroups
-          v-else
-          :key="`groups-${session}`"
-          :session="session"
-          :account="account"
-        />
-      </KeepAlive>
+      </div>
     </template>
 
-    <p v-if="error" class="error" role="alert">{{ error }}</p>
+    <p
+      v-if="error && !session"
+      class="error"
+      role="alert"
+    >
+      {{ error }}
+    </p>
   </main>
 </template>
 
@@ -278,7 +408,13 @@ body {
 }
 
 .auth-card.signed-in {
-  width: min(900px, calc(100% - 32px));
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--background);
 }
 
 .brand {
@@ -384,7 +520,7 @@ button:disabled {
 }
 
 @media (max-width: 600px) {
-  .auth-card {
+  .auth-card:not(.signed-in) {
     margin: 24px auto;
     padding: 24px;
   }
@@ -411,5 +547,169 @@ button:disabled {
 .page-nav button[aria-current="page"] {
   border-bottom-color: var(--accent);
   font-weight: 700;
+}
+</style>
+
+<style>
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 245px minmax(0, 1fr);
+}
+
+.app-sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 31px 19px;
+  background: #fff;
+  border-right: 1px solid var(--border);
+}
+
+.sidebar-brand {
+  font-size: 25px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -0.7px;
+}
+
+.sidebar-subtitle {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--muted);
+  margin: 0 0 26px;
+}
+
+.sidebar-nav {
+  display: grid;
+  gap: 7px;
+}
+
+.sidebar-nav button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-radius: 11px;
+  padding: 13px 14px;
+  background: transparent;
+  text-align: left;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sidebar-nav button:hover {
+  background: var(--background);
+}
+
+.sidebar-nav button[aria-current="page"] {
+  background: #eee8fc;
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.nav-symbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  font-size: 19px;
+}
+
+.sidebar-bottom {
+  margin-top: auto;
+  padding: 20px 8px 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+}
+
+.signed-in-as {
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.signed-in-as strong {
+  color: var(--text);
+}
+
+.signout-button {
+  width: 100%;
+  padding: 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.workspace-main {
+  width: min(1130px, 100%);
+  min-width: 0;
+  margin: 0 auto;
+  padding: 38px clamp(18px, 4vw, 52px) 80px;
+}
+
+.workspace-topbar {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    display: block;
+  }
+
+  .app-sidebar {
+    position: static;
+    height: auto;
+    padding: 12px 16px;
+    gap: 9px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-brand,
+  .sidebar-subtitle {
+    display: none;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+  }
+
+  .sidebar-nav button {
+    white-space: nowrap;
+    width: auto;
+    padding: 9px 11px;
+    font-size: 13px;
+  }
+
+  .sidebar-bottom {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 0;
+  }
+
+  .signout-button {
+    width: auto;
+    font-size: 12px;
+    padding: 7px 10px;
+  }
+
+  .workspace-main {
+    padding: 24px 16px 50px;
+  }
 }
 </style>

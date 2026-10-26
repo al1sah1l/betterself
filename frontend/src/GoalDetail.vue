@@ -1,9 +1,11 @@
+
 <script setup lang="ts">
 import { ref } from "vue";
 import GoalDetailContent from "./GoalDetailContent.vue";
 import ObservedResults from "./ObservedResults.vue";
 import PlanControls from "./PlanControls.vue";
 import ProgressReview from "./ProgressReview.vue";
+import ProgressOverview from "./ProgressOverview.vue";
 
 defineProps<{
   session: string;
@@ -14,24 +16,43 @@ type Section = "plan" | "results" | "review";
 
 const activeSection = ref<Section>("plan");
 const revision = ref(0);
+const progressRevision = ref(0);
+
+function selectSection(section: Section) {
+  if (activeSection.value !== section) {
+    activeSection.value = section;
+    progressRevision.value += 1;
+  }
+}
 
 function planSaved() {
   revision.value += 1;
+  progressRevision.value += 1;
 }
 
 function reviewSaved() {
   revision.value += 1;
+  progressRevision.value += 1;
   activeSection.value = "plan";
 }
 </script>
 
 <template>
   <div class="goal-workspace">
-    <nav class="goal-navigation" aria-label="Goal sections">
+    <ProgressOverview
+      :session="session"
+      :goal="goal"
+      :revision="progressRevision"
+    />
+
+    <nav
+      class="goal-navigation"
+      aria-label="Goal sections"
+    >
       <button
         type="button"
         :aria-pressed="activeSection === 'plan'"
-        @click="activeSection = 'plan'"
+        @click="selectSection('plan')"
       >
         Plan
       </button>
@@ -39,7 +60,7 @@ function reviewSaved() {
       <button
         type="button"
         :aria-pressed="activeSection === 'results'"
-        @click="activeSection = 'results'"
+        @click="selectSection('results')"
       >
         Results
       </button>
@@ -47,13 +68,16 @@ function reviewSaved() {
       <button
         type="button"
         :aria-pressed="activeSection === 'review'"
-        @click="activeSection = 'review'"
+        @click="selectSection('review')"
       >
         Review
       </button>
     </nav>
 
-    <section v-show="activeSection === 'plan'" aria-label="Goal plan">
+    <section
+      v-show="activeSection === 'plan'"
+      aria-label="Goal plan"
+    >
       <p class="section-description">
         Your strategy, commitments, and submitted evidence.
       </p>
@@ -77,8 +101,8 @@ function reviewSaved() {
       aria-label="Observed results"
     >
       <p class="section-description">
-        Record what changed in the real world, separately from
-        completing your commitments.
+        Record what changed in the real world,
+        separately from completing your commitments.
       </p>
 
       <ObservedResults
@@ -93,8 +117,8 @@ function reviewSaved() {
       aria-label="Progress review"
     >
       <p class="section-description">
-        Review your execution and results, then decide whether to
-        change your strategy.
+        Review your execution and results, then
+        decide whether to change your strategy.
       </p>
 
       <ProgressReview

@@ -1,11 +1,13 @@
+
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import { api, ApiError } from "./api";
 import CreateGoal from "./CreateGoal.vue";
 import GoalDetail from "./GoalDetail.vue";
 
 const props = defineProps<{
   session: string;
+  requestedGoal?: string;
 }>();
 
 type Goal = {
@@ -40,15 +42,27 @@ async function loadGoals() {
     goals.value = result.goals;
   } catch (cause) {
     error.value =
-      cause instanceof ApiError && cause.code === "UNAUTHORIZED"
+      cause instanceof ApiError &&
+      cause.code === "UNAUTHORIZED"
         ? "Your session has expired. Please sign out and sign in again."
-        : cause instanceof Error && !(cause instanceof ApiError)
+        : cause instanceof Error &&
+            !(cause instanceof ApiError)
           ? cause.message
           : "Could not load your goals. Please try again.";
   } finally {
     loading.value = false;
   }
 }
+
+watch(
+  () => props.requestedGoal,
+  (goal) => {
+    if (goal) {
+      selectedGoal.value = goal;
+    }
+  },
+  { immediate: true },
+);
 
 onMounted(loadGoals);
 </script>
@@ -97,8 +111,15 @@ onMounted(loadGoals);
         />
       </div>
 
-      <p v-if="loading" role="status">Loading goals...</p>
-      <p v-else-if="error" class="error" role="alert">
+      <p v-if="loading" role="status">
+        Loading goals...
+      </p>
+
+      <p
+        v-else-if="error"
+        class="error"
+        role="alert"
+      >
         {{ error }}
       </p>
 
@@ -108,13 +129,15 @@ onMounted(loadGoals);
         </p>
 
         <ul v-else class="goal-grid">
-            <li
-                v-for="goal in goals"
-                :key="goal.goal"
-                class="goal-card"
-            >
+          <li
+            v-for="goal in goals"
+            :key="goal.goal"
+            class="goal-card"
+          >
             <strong>{{ goal.outcome }}</strong>
-            <p class="muted">{{ goal.timeline }}</p>
+            <p class="muted">
+              {{ goal.timeline }}
+            </p>
 
             <button
               class="text-button"
@@ -169,7 +192,8 @@ onMounted(loadGoals);
 
 .goal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  grid-template-columns:
+    repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 16px;
   padding: 0;
   margin: 24px 0;
