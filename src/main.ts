@@ -25,6 +25,10 @@ import {
   withExistingGoal,
 } from "./http/goal-operation-lock.ts";
 
+import {
+  cleanupOrphanImages,
+} from "./http/orphan-image-cleanup.ts";
+
 const application = assembleApplication();
 
 const gateway = createGateway({
@@ -316,6 +320,38 @@ async function recoverImageCleanup(): Promise<void> {
 }
 
 await recoverImageCleanup();
+
+async function runOrphanImageCleanup(): Promise<void> {
+  try {
+    const result = await cleanupOrphanImages(db);
+
+    console.log(
+      `[image-cleanup] ` +
+      `${result.scanned} scanned, ` +
+      `${result.removed} removed, ` +
+      `${result.retained} retained, ` +
+      `${result.failed} failed`,
+    );
+  } catch (error) {
+    console.error(
+      "[image-cleanup] Maintenance failed:",
+      error,
+    );
+  }
+}
+
+// Run once at startup.
+await runOrphanImageCleanup();
+
+// Repeat daily while this server is running.
+const orphanCleanupInterval = setInterval(
+  () => {
+    void runOrphanImageCleanup();
+  },
+  24 * 60 * 60 * 1000,
+);
+
+orphanCleanupInterval.unref();
 
 const server = Bun.serve({
   hostname: process.env.HOST ?? "127.0.0.1",
