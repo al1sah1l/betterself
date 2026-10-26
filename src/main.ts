@@ -321,6 +321,29 @@ async function recoverImageCleanup(): Promise<void> {
 
 await recoverImageCleanup();
 
+async function checkProductionMongoDB(): Promise<void> {
+  try {
+    const info = await db.admin().command({
+      hello: 1,
+    });
+
+    console.log("[database] Configuration:", {
+      replicaSet: info.setName ?? null,
+      primary: info.isWritablePrimary ?? false,
+      mongos: info.msg === "isdbgrid",
+      transactionsSupported:
+        Boolean(info.setName || info.msg === "isdbgrid"),
+    });
+  } catch (error) {
+    console.error(
+      "[database] Configuration check failed:",
+      error,
+    );
+  }
+}
+
+await checkProductionMongoDB();
+
 async function runOrphanImageCleanup(): Promise<void> {
   try {
     const result = await cleanupOrphanImages(db);
