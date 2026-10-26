@@ -17,16 +17,26 @@ import {
   handleResourceManagementRequest,
 } from "./http/resource-management.ts";
 
+import {
+  guardedGoalId,
+  goalForProof,
+  isProofScopedMutation,
+  proofStillBelongsToGoal,
+  withExistingGoal,
+} from "./http/goal-operation-lock.ts";
+
 const application = assembleApplication();
 
 const gateway = createGateway({
   application,
 });
 
+// Keep a reference to the original Sync Engine
+// invocation before applying our HTTP safeguards.
 const invokeGateway =
   gateway.invoke.bind(gateway);
 
-gateway.invoke = async (
+const invokeWithValidation: typeof gateway.invoke = async (
   path,
   input,
   options,
@@ -115,6 +125,111 @@ gateway.invoke = async (
   return result;
 };
 
+gateway.invoke = async (path, input, options) => {
+  const missingGoal = () => ({
+    ok: false as const,
+    error: {
+      kind: "domain" as const,
+      value: "GOAL_NOT_FOUND",
+    },
+  });
+
+  const missingProof = () => ({
+    ok: false as const,
+    error: {
+      kind: "domain" as const,
+      value: "PROOF_NOT_FOUND",
+    },
+  });
+
+  const goal = guardedGoalId(path, input);
+
+  if (goal) {
+    return withExistingGoal(
+      db,
+      goal,
+      async () => {
+        const result = await invokeWithValidation(
+          path,
+          input,
+          options,
+        );
+
+        if (result.ok) {
+          await gateway.whenIdle();
+        }
+
+        return result;
+      },
+      missingGoal,
+    );
+  }
+
+  if (isProofScopedMutation(path)) {
+    const payload = input as {
+      previousProof?: unknown;
+      proof?: unknown;
+    } | null;
+
+    const proofId = path === "/proofs/resubmit"
+      ? payload?.previousProof
+      : payload?.proof;
+
+    if (typeof proofId !== "string" || !proofId) {
+      return invokeWithValidation(
+        path,
+        input,
+        options,
+      );
+    }
+
+    const proofGoal = await goalForProof(
+      db,
+      proofId,
+    );
+
+    if (!proofGoal) {
+      return missingProof();
+    }
+
+    return withExistingGoal(
+      db,
+      proofGoal,
+      async () => {
+        const stillExists =
+          await proofStillBelongsToGoal(
+            db,
+            proofId,
+            proofGoal,
+          );
+
+        if (!stillExists) {
+          return missingProof();
+        }
+
+        const result = await invokeWithValidation(
+          path,
+          input,
+          options,
+        );
+
+        if (result.ok) {
+          await gateway.whenIdle();
+        }
+
+        return result;
+      },
+      missingGoal,
+    );
+  }
+
+  return invokeWithValidation(
+    path,
+    input,
+    options,
+  );
+};
+
 const handler = createHttpHandler({
   application,
   gateway,
@@ -174,13 +289,6 @@ const handler = createHttpHandler({
   }),
 });
 
-/**
- * Recover durable GridFS cleanup jobs left by an
- * earlier delete operation or interrupted shutdown.
- *
- * This processes one bounded batch per startup.
- * Pending jobs are retained for another retry.
- */
 async function recoverImageCleanup(): Promise<void> {
   try {
     await db.command(
@@ -202,8 +310,8 @@ async function recoverImageCleanup(): Promise<void> {
       error,
     );
 
-    // Startup is allowed to continue. Pending cleanup
-    // records are retained in MongoDB for another retry.
+    // Startup may continue. Failed jobs remain
+    // in MongoDB for later recovery.
   }
 }
 
@@ -250,7 +358,9 @@ const server = Bun.serve({
       );
     }
 
-    if (path.startsWith("/api/images/")) {
+    if (
+      path.startsWith("/api/images/")
+    ) {
       return handleImageRequest(
         request,
         (target, body) =>
