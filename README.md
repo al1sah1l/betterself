@@ -1,197 +1,613 @@
 # BetterSelf
 
-BetterSelf is a goal-pursuit application that helps users turn broad goals into realistic strategies, follow through on concrete commitments, demonstrate their execution through peer accountability, and revise plans based on real-world results.
+**BetterSelf** is a goal-pursuit application that helps people turn ambitious goals into actionable strategies, follow through on concrete commitments, demonstrate their execution through evidence and peer accountability, and adapt their plans based on observed results.
 
-Its core loop is **goal → strategy → commitments → execution and proof → observed results → review → revision**. Completion claims, evidence, peer verification, and observed results are deliberately modeled separately.
+**Live application:** https://betterself.mit-sdg.dev/
+
+**Course:** MIT 6.1040 Software Design, Fall 2026
+
+## Overview
+
+People often know what they want to achieve but struggle to translate their goals into realistic plans and consistent action. Even when they complete planned activities, they may not know whether those activities are bringing them closer to their desired outcomes.
+
+BetterSelf addresses this problem through a structured, evidence-based goal-pursuit process:
+
+**Goal → Strategy → Commitments → Execution and Proof → Observed Results → Review → Revision**
+
+The application deliberately separates four concepts:
+
+- **Commitment completion:** The user claims to have performed a planned action.
+- **Evidence:** The user provides supporting proof of that action.
+- **Peer verification:** Another user evaluates whether the evidence supports the claim.
+- **Observed results:** The user records whether their actions have produced meaningful progress toward the desired outcome.
+
+This separation allows BetterSelf to support accountability without assuming that completing tasks automatically means achieving a goal.
+
+---
 
 ## P1: Design (October 5, 2026)
 
-The initial design established the core goal-pursuit loop, concept boundaries, and early sketches of Dashboard, Goals, Commitments, and Groups. See the [P1 design document](docs/design.md) for the original scope and sketches.
+The initial design established the goal-pursuit loop, core concepts, and early interface sketches.
+
+The design focused on:
+
+- Translating desired outcomes into strategies.
+- Converting strategies into concrete commitments.
+- Supporting accountability through evidence and peer review.
+- Separating execution from real-world outcomes.
+- Allowing users to revise strategies based on what they learn.
+
+The initial sketches covered Dashboard, Goals, Commitments, and Groups.
+
+See the [P1 design document](docs/design.md).
+
+---
 
 ## P2: Alpha MVP (October 13, 2026)
 
-### Core user journey
+The Alpha implemented the first complete accountability journey.
 
-Starting with an empty database, Maya registers an account and creates a goal by describing her desired outcome, current context, constraints, timeline, and definition of success. She requests an AI strategy proposal, edits it, and explicitly saves the strategy she wants to use. She turns a strategy step into a commitment, adjusting its description, schedule, and recurrence before saving. Maya creates an accountability group, and Alex registers a separate account and joins using its group ID. Maya attaches her goal to the group and submits text or link evidence for a completed commitment occurrence. Reactions automatically record a completion claim and share the proof with the attached group. Alex reads the shared proof and verifies or disputes it. Completion claims and peer reviews remain separate, and the interface updates after these actions without a page refresh.
+Starting with an empty database, Maya could register, create a goal, request an AI-generated strategy, edit and accept it, create a commitment, and join an accountability group.
 
-### Alpha scope and deferred work
+After completing a commitment, Maya could submit evidence. The application automatically recorded a completion claim and shared the proof with her attached group. Another member, Alex, could review the submitted evidence and verify or dispute it.
 
-The Alpha supports initial AI strategy proposals, user-confirmed commitments, accountability groups, proof submission, completion claims, and peer verification.
+The Alpha established the core domain concepts and their interactions.
 
-Evidence is currently text or links; file uploads are not implemented. Adaptive review and replanning, group chat, and the broader dashboard from the P1 sketches are deferred to P3 or later.
+At this stage, proof evidence was limited to text and links. More advanced review, image evidence, and the broader dashboard were implemented in later milestones.
 
-> **Historical milestone:** This section describes what was in scope for P2 Alpha. Features described as deferred here may now be implemented in the P3 Beta section below. The limitations near the end of this README describe the current application.
-
+---
 
 ## P3: Beta — Complete Functionality
 
-### Updated user journey
+The Beta expanded the Alpha into a more complete goal-management application.
 
-Starting with an empty database, Maya registers an account and creates a goal with its desired outcome, current context, constraints, timeline, and success definition. She requests an AI-generated strategy, edits the suggested steps, and explicitly approves the strategy before it is saved. She creates one-time or recurring commitments based on those steps, choosing a schedule and adjusting the wording as needed.
+### Expanded user journey
 
-Maya creates an accountability group (public or private), and Alex joins it using the public group search or a shared private group ID. Maya attaches her goal to the group. She submits text or link evidence for a commitment occurrence. The application records a completion claim and automatically shares the proof with her accountability group. Alex reviews it and marks it verified or disputed. Maya can see her proof, its review status, and the review history on her goal page. A disputed proof can be resubmitted as a new attempt without losing the earlier review or creating another completion claim.
+Maya creates a goal by specifying her desired outcome, current situation, constraints, timeline, and definition of success.
 
-Maya separately records observed results—whether her actions are achieving her intended outcome. She can then request an AI progress review that considers her strategy, execution, and observed results. She reviews the proposed changes and explicitly accepts or edits the next strategy revision. The goal detail interface organizes this work into **Plan**, **Results**, and **Review** sections.
+She requests an AI-generated strategy, edits the suggested steps, and explicitly accepts the strategy.
+
+She converts strategy steps into one-time or recurring commitments. Commitments can have their own schedules and can later be retired without losing their completion and proof history.
+
+Maya creates a public or private accountability group. Alex joins through public group discovery or a private group ID.
+
+When Maya submits proof, BetterSelf records the relevant completion claim and shares the proof with her attached group. Alex can verify or dispute the evidence.
+
+If a proof is disputed, Maya can resubmit new evidence while preserving earlier attempts and review history.
+
+Maya also records observed results separately from completed commitments. She can request an AI-assisted progress review, evaluate suggested improvements, and explicitly accept or edit a strategy revision.
 
 ### Beta functionality
 
-- Username/password authentication with persisted accounts and sessions, and application data in MongoDB.
-- Goal creation, editing, and personal goal overview.
-- AI-assisted initial strategy proposals that require user approval.
-- Strategy steps linked to editable one-time or recurring commitments; commitment retirement preserves history.
-- Text/link proof submission, automatic completion claims, and automatic proof sharing with the attached group.
-- Public/private accountability groups, group discovery, join-by-ID, and owner-controlled group settings.
-- Peer verification or dispute, with authorization and self-review restrictions.
-- Pending proof deletion when no review exists; replacement proof for the same one-time occurrence.
-- Disputed proof resubmission with preserved attempts and reviews.
-- Separate observed-results tracking and AI-assisted strategy review/revision, with user approval.
-- Updated UI with Plan / Results / Review tabs, clearer visual hierarchy, and clickable evidence URLs.
+- Persistent accounts and authenticated sessions.
+- Goal creation, editing, and personal goal management.
+- AI-generated strategy proposals requiring user approval.
+- Editable one-time and recurring commitments.
+- Commitment retirement with preserved history.
+- Proof submission and automatic completion claims.
+- Public and private accountability groups.
+- Group discovery, joining, and owner-controlled settings.
+- Automatic proof sharing with attached groups.
+- Peer verification and dispute.
+- Proof resubmission with preserved attempt history.
+- Deletion of unreviewed pending proofs.
+- Separate observed-results tracking.
+- AI-assisted progress review and strategy revision.
+- Plan, Results, and Review sections in the goal interface.
 
-### Design decisions and boundaries
+### P3 submission materials
 
-**Completion, evidence, peer verification, and observed results are distinct.** A user can execute a commitment without necessarily achieving their desired outcome. The app uses that distinction to support strategy review instead of treating a completion checkbox as success.
+- [P1 design document](docs/design.md)
+- [P3 test results](test-results/p3-tests.txt) — 205 passing tests in the recorded P3 validation.
+- [Visual Design Study — Typography & Color](docs/BetterSelf_Visual_Design_Study_Beta_UI_Updated.pdf)
+- [Beta demonstration video](https://drive.google.com/file/d/1B2yCBv189ynPdFAyojnRX8xBB8lIsn21/view?usp=sharing)
+- [Deployed application](https://betterself.mit-sdg.dev/)
+- [Design notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md)
 
-The Beta supports text and URL evidence, not uploaded files or images. Group chat, automated proof verification, automatic group matching, external integrations, and real-time cross-browser synchronization are outside the current scope.
+The design notebook is maintained in the private course repository and is available to authorized course staff.
 
-## P3 submission materials
+---
 
-- [Updated user journey](#updated-user-journey) — documented above.
-- [Saved automated test output](test-results/p3-tests.txt) — 205 passing tests, 0 failures in the final local run reported for P3.
-- [Visual Design Study — Typography & Color](docs/BetterSelf_Visual_Design_Study_Beta_UI_Updated.pdf).
-- **Narrated Beta demo (YouTube, up to 2 minutes):** https://drive.google.com/file/d/1B2yCBv189ynPdFAyojnRX8xBB8lIsn21/view?usp=sharing
-- **Deployed Beta app:** https://betterself.mit-sdg.dev/
-- [P1 design submission](docs/design.md).
-- [Design notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md) — maintained in the private individual repository; accessible to authorized course staff.
+## P4: Code Complete (October 26, 2026)
 
-## Running locally
+P4 focuses on making BetterSelf more complete, usable, and reliable.
 
-Requirements: Bun 1.4.2, Podman with Compose support, and MongoDB through the included Compose setup.
+The application now includes an improved goal workspace, goal prioritization, image evidence, progress visualization, resource-management operations, and a redesigned interface.
 
-Install dependencies from the repository root:
+### 1. Goal creation and planning
+
+Users create goals using five fields:
+
+1. Desired outcome
+2. Current context
+3. Constraints
+4. Timeline
+5. Success definition
+
+The goal-creation interface provides a structured form with clear sections and validation.
+
+After creating a goal, users can request an AI-generated strategy. They may edit or accept the proposal before it becomes their saved strategy.
+
+Strategy steps can be converted into commitments, but users may also create commitments independently.
+
+### 2. Goal Workspace
+
+Each goal has a dedicated workspace organized into three sections:
+
+**Plan**
+
+- View the goal context and current strategy.
+- Create commitments from strategy steps.
+- Add custom commitments.
+- View active and retired commitments.
+- Submit proofs and inspect peer reviews.
+- Attach the goal to an accountability group.
+
+**Results**
+
+- Record observed changes in the real world.
+- Track whether actions are producing progress toward the desired outcome.
+
+**Review**
+
+- Request an AI-assisted evaluation of progress.
+- Review suggested changes to the strategy.
+- Accept or edit a revised strategy.
+
+The workspace also includes:
+
+- A prominent goal title and target timeline.
+- Quick actions for submitting proof and recording results.
+- Progress summaries.
+- A shortcut to Goal Settings through the `...` button on the goal description card.
+
+Goal Settings contains goal editing, commitment management, and goal deletion.
+
+### 3. Priority Goals
+
+Users can choose one goal as their current priority.
+
+The selected priority:
+
+- Is saved to MongoDB.
+- Appears prominently in the Dashboard.
+- Is displayed first in the goals list.
+- Influences the ordering of commitments shown on the Dashboard.
+- Can be changed or cleared by the user.
+
+Prioritization is user-controlled rather than determined automatically by AI.
+
+### 4. Commitments and progress
+
+BetterSelf supports one-time and recurring commitments.
+
+Users can:
+
+- Create commitments from strategy steps.
+- Customize commitment descriptions and schedules.
+- Submit evidence for completed occurrences.
+- Review completion and proof history.
+- Retire commitments while preserving historical records.
+
+Progress views summarize commitments and recorded activity. Completion counts are kept distinct from observed outcomes.
+
+### 5. Proof submission and image attachments
+
+Users can provide text, URLs, and uploaded images as evidence.
+
+Supported image formats:
+
+- PNG
+- JPEG
+- WebP
+- GIF
+
+The application supports up to six uploaded images per proof, with a maximum size of 5 MB per image.
+
+Uploaded images are stored in MongoDB GridFS rather than an external file-storage service.
+
+The backend validates image formats and enforces ownership checks before an image can be submitted as evidence.
+
+Image viewing is authenticated. Authors can view their uploads, and eligible group members can view images referenced by proofs shared with their groups.
+
+### 6. Peer accountability
+
+BetterSelf supports public and private accountability groups.
+
+Users can:
+
+- Create groups.
+- Discover public groups.
+- Join groups through the supported discovery or ID flows.
+- Attach goals to groups.
+- View shared proofs.
+- Verify or dispute another member's proof.
+- Resubmit disputed evidence.
+- Leave groups when permitted.
+
+Group owners have additional controls for group management.
+
+The application prevents users from reviewing their own proofs.
+
+### 7. Resource management
+
+Users can edit goals, retire commitments, delete goals, and leave accountability groups.
+
+**Goal deletion** removes associated commitments, completion records, proofs, reviews, group references, and observed results. It also clears the user's priority selection if the deleted goal was their priority.
+
+Image cleanup is handled separately through persistent MongoDB cleanup jobs. Pending jobs can be retried after server restart.
+
+**Leaving a group** removes the user's membership and relevant group-specific references while preserving their personal goals, commitments, and proof history.
+
+The production deployment uses standalone MongoDB, so these multi-document cleanup operations are performed sequentially rather than as MongoDB transactions.
+
+### 8. Updated visual design
+
+The P4 interface uses a consistent purple visual identity, with improved hierarchy and navigation.
+
+Notable changes include:
+
+- A redesigned Dashboard with progress summaries.
+- Priority goal highlighting.
+- More structured goal creation.
+- Goal Workspace navigation.
+- Improved strategy and commitment cards.
+- Clear proof status indicators.
+- Dedicated interfaces for Results and Review.
+- Goal Settings accessible through an overflow button.
+- Confirmation before destructive operations.
+
+Proof statuses remain visually differentiated, with Verified using the application's purple color palette.
+
+---
+
+## Technology Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | Vue 3, TypeScript, Vite |
+| Backend | Bun, TypeScript |
+| Application architecture | MIT Sync Engine |
+| Database | MongoDB |
+| Image storage | MongoDB GridFS |
+| AI features | OpenAI API |
+| Testing | Bun Test |
+| Deployment | MIT 6.1040 Apps |
+
+The backend and frontend are maintained in one repository.
+
+The backend serves the application API and the compiled frontend in production.
+
+### Application architecture
+
+The system uses concept-oriented design through MIT Sync Engine.
+
+Its main responsibilities include:
+
+- Authentication and session management.
+- Goal planning and strategy management.
+- Commitment tracking and completion recording.
+- Proof submission and verification.
+- Accountability group membership and proof sharing.
+- Observed-results tracking.
+- AI-assisted strategy proposal and review.
+
+Concepts are connected through application synchronization and reactions, including automatic completion recording and proof sharing.
+
+Additional HTTP endpoints implement functionality such as image upload and access control, goal priority selection, and resource cleanup.
+
+---
+
+## Running Locally
+
+### Requirements
+
+- Bun 1.4.2
+- Podman with Compose support
+- MongoDB through the provided `compose.yaml`
+- An OpenAI API key for AI-generated strategies and reviews
+
+### 1. Install dependencies
+
+From the repository root:
 
 ```bash
 bun install
 ```
 
-Create `.env` in the repository root:
+### 2. Configure environment variables
+
+Create a `.env` file containing the MongoDB connection URL for your local database.
+
+For the current local replica-set configuration:
 
 ```dotenv
-MONGODB_URL=mongodb://dev:dev@localhost:27017/betterself?authSource=admin
+MONGODB_URL=mongodb://127.0.0.1:27017/betterself?replicaSet=rs0&directConnection=true
 ```
 
-For real AI strategy proposals and progress reviews, configure a valid API key in `.env.local` (never commit either environment file):
+The local Compose configuration starts `mongod` with replica-set mode enabled. A fresh MongoDB data volume may require one-time replica-set initialization.
+
+**MongoDB transactions are not required by the current resource-management implementation.** The deployed application uses the standalone MongoDB service supplied by MIT Apps.
+
+Configure AI credentials in `.env.local`:
 
 ```dotenv
 OPENAI_API_KEY=your-api-key
-# Optional: OPENAI_MODEL=your-supported-model
+# Optional:
+# OPENAI_MODEL=your-supported-model
 ```
 
-Start MongoDB:
+Do not commit local environment files or API keys.
+
+### 3. Start MongoDB
 
 ```bash
 bun run db:up
 ```
 
-Start the backend in one terminal:
+Check database connectivity:
+
+```bash
+bun run db:check
+```
+
+### 4. Start the backend
 
 ```bash
 bun run start
 ```
 
-Start the frontend development server in another terminal:
+The default backend port is 3000.
+
+### 5. Start the frontend development server
+
+In another terminal:
 
 ```bash
 bun run dev:frontend
 ```
 
-Open http://localhost:5173. Register two accounts to try peer verification. Usernames must contain 3–32 letters, numbers, underscores, or hyphens; passwords must contain 8–128 characters.
+Open:
 
-Application data is persisted in MongoDB. For changes to the frontend served directly by the backend on port 3000, run `bun run build:frontend` before refreshing that production-style page; `bun run start` does not rebuild Vue assets.
+http://localhost:5173
 
-## Automated tests and validation
+For a complete accountability flow, register two different accounts so that one user can submit a proof and the other can review it.
 
-Start local MongoDB and run the complete Bun test suite:
+Usernames must contain 3–32 letters, numbers, underscores, or hyphens. Passwords must contain 8–128 characters.
 
-```bash
-bun run db:up
-bun test
-```
+### Production-style local preview
 
-To save an updated test log:
-
-```bash
-mkdir -p test-results
-set -o pipefail
-bun test 2>&1 | tee test-results/p3-tests.txt
-```
-
-Check the concept specifications, generated artifacts, TypeScript, and frontend:
-
-```bash
-bun run generate
-bun run check
-bun run check:frontend
-bun run build:frontend
-```
-
-Alternatively, run against a temporary in-memory MongoDB server:
-
-```bash
-bun run test:memory
-```
-
-Tests use their own isolated databases and must never target the deployed application database. The AI-related automated tests use injected test generators rather than paid API calls.
-
-The latest local P3 validation reported **205 passing tests and no failures**. The sync-engine check also reported 37 non-blocking advisories (endpoint fallbacks and order-sensitive formers); a passing diagnostic does not guarantee every possible request path is covered.
-
-## Production preview
-
-Dependencies for both backend and Vue are installed from the root package; there is no separate frontend package.
-
-Stop any existing backend on port 3000, then run:
+To build and serve the frontend directly through Bun:
 
 ```bash
 bun run preview
 ```
 
-This starts the local database, builds the frontend, and starts the backend in production mode.
+Open:
 
-- http://127.0.0.1:3000/health should return `{"status":"ok"}` when MongoDB is available.
-- http://127.0.0.1:3000 should show BetterSelf.
+http://127.0.0.1:3000
 
-The backend serves the built frontend and `/api` together. Sign in, create data, reload, and check that your records remain available.
+The health endpoint is:
 
-## Deployment on 6.1040 Apps
+http://127.0.0.1:3000/health
 
-Use the following settings:
+It should return:
+
+```json
+{"status":"ok"}
+```
+
+when MongoDB is available.
+
+---
+
+## Testing and Validation
+
+### Complete test suite
+
+```bash
+bun test
+```
+
+### Resource-management tests
+
+```bash
+bun test ./tests/http/resource-management.test.ts
+```
+
+### In-memory MongoDB tests
+
+```bash
+bun run test:memory
+```
+
+### TypeScript and architecture checks
+
+```bash
+bun run generate
+bun run check
+```
+
+### Frontend validation
+
+```bash
+bun run check:frontend
+bun run build:frontend
+```
+
+These commands validate the concept artifacts, TypeScript, Vue components, and production frontend build.
+
+The P3 submission included a saved result of 205 passing tests. Additional tests were introduced during P4, particularly for image management, resource deletion, and concurrency-related behavior.
+
+The complete local test suite and build were run successfully before the final P4 deployment.
+
+Tests use isolated databases and should not be run against the deployed application's production database.
+
+AI-related automated tests use injected test generators rather than requiring paid model calls.
+
+### Manual end-to-end verification
+
+The main user journey should cover:
+
+1. Register and sign in.
+2. Create a goal.
+3. Generate and accept a strategy.
+4. Create a commitment.
+5. Select a priority goal.
+6. Create or join an accountability group.
+7. Attach a goal to the group.
+8. Submit proof with text or an image.
+9. Verify or dispute the proof using another account.
+10. Inspect completion history and proof status.
+11. Record observed results.
+12. Request a strategy review and accept a revision.
+13. Edit a goal through Goal Settings.
+14. Test goal deletion and group leaving using disposable test data.
+
+---
+
+## Deployment on MIT Apps
+
+**Live URL:** https://betterself.mit-sdg.dev/
+
+The application is deployed through the MIT 6.1040 Apps platform.
+
+### Deployment configuration
 
 | Setting | Value |
 | --- | --- |
 | Runtime | Bun |
-| Package directories | `.` |
+| Package directory | `.` |
 | Build script | `build` |
 | Start script | `start` |
 | Port | `3000` |
-| Health check path | `/health` |
+| Health check | `/health` |
 
-The Bun version in `packageManager` should match the version used locally.
+Configure the following environment variables:
 
-Add MongoDB through the platform and name its supplied connection variable `MONGODB_URL`. The application selects the database from the connection string using `client.db()`; do not add `MONGODB_DB_NAME`.
+- `MONGODB_URL` — provided by the MongoDB service on MIT Apps.
+- `OPENAI_API_KEY` — required for live AI requests.
+- `OPENAI_MODEL` — optional model configuration.
 
-Configure `OPENAI_API_KEY` and, if necessary, `OPENAI_MODEL`. The platform supplies `HOST`, `PORT`, and `NODE_ENV` automatically. The application supports username/password sign-in.
+MIT Apps supplies runtime configuration such as `HOST`, `PORT`, and `NODE_ENV`.
 
-Commit and push tested changes, including `bun.lock` if it changed. Select the exact submitted commit on the platform and deploy explicitly. **Pushing to GitHub does not redeploy the app.** Verify the live UI and flows after deployment.
+The application reads its MongoDB database name from the connection URL.
 
-The deployed database is separate from the local MongoDB database.
+### Deployment workflow
 
-## Known limitations
+1. Run the local test suite and validation commands.
+2. Commit the tested changes.
+3. Push the commit to GitHub.
+4. Select that commit for deployment in MIT Apps.
+5. Deploy the application.
+6. Verify that the build and application startup succeed.
+7. Check the `/health` endpoint.
+8. Test the deployed UI and representative user flows.
 
-- Evidence can be text or links, not direct image/file uploads.
-- Peer activity from another browser is not pushed live; reload controls retrieve the latest state.
-- Some concurrency coordination uses process-local locks. Database uniqueness constraints protect important duplicate-write cases, but this is not a general distributed transaction design.
-- Automatic proof verification, group chat, group recommendations, and external service integrations are not part of Beta.
+Pushing a commit to GitHub does not automatically redeploy the application. A new deployment must be initiated through the platform.
 
-## Design notebook
+The deployed MongoDB database is separate from the local development database.
 
-Design decisions, tradeoffs, implementation problems, and manual validation notes are recorded in the [private individual design notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md) (available to authorized course staff).
+### Production MongoDB compatibility
 
+The production MongoDB instance on MIT Apps reports standalone topology rather than replica-set membership.
+
+Accordingly, goal deletion and group leaving use ordinary sequential MongoDB operations without multi-document transactions.
+
+This avoids requiring changes to the managed MongoDB service.
+
+---
+
+## Design Decisions
+
+### User approval of AI suggestions
+
+AI-generated strategies and revisions are proposals, not automatically applied decisions.
+
+Users can inspect and edit recommendations before saving them.
+
+This keeps users in control of their plans.
+
+### Execution is not the same as success
+
+Completing commitments is useful evidence of execution, but it does not necessarily show that the desired outcome has been achieved.
+
+Observed results are tracked separately to support meaningful progress evaluation.
+
+### Proofs and verification are separate
+
+Submitting evidence records what the user claims to have done.
+
+A peer review provides an additional accountability signal.
+
+The system preserves disputed attempts and their review history rather than rewriting the past.
+
+### User-controlled prioritization
+
+BetterSelf allows users to explicitly select their current priority goal.
+
+The application does not automatically decide which personal goal deserves the most attention.
+
+### Image storage in MongoDB
+
+Image evidence is stored in MongoDB GridFS to keep the prototype's infrastructure relatively simple.
+
+Authenticated access checks prevent arbitrary users from viewing uploaded evidence.
+
+### Standalone MongoDB support
+
+Because the production environment does not provide MongoDB transactions, resource deletion uses a sequential, retry-oriented approach.
+
+This is a deliberate deployment tradeoff rather than an atomic multi-document deletion guarantee.
+
+---
+
+## Known Limitations
+
+BetterSelf is a course prototype and has several limitations:
+
+- **No atomic multi-document deletion in production.** Standalone MongoDB does not provide transaction-based rollback for the resource-management workflow. An interrupted deletion may leave partial cleanup work.
+- **Process-local concurrency coordination.** Some backend operations use in-process goal locks, which do not coordinate across multiple application instances.
+- **Limited restart recovery.** Persistent image-cleanup jobs are retried after startup, but arbitrary partially completed goal deletions are not automatically resumed by a general recovery worker.
+- **Orphaned images.** Automatic periodic cleanup of unreferenced uploads is disabled to avoid races with in-progress proof submission. Goal-deletion cleanup remains supported.
+- **Manual refresh for peer activity.** Changes made by another browser are not pushed to all connected users in real time. The UI provides reload and refresh controls.
+- **AI assistance is optional.** Strategy proposals and progress reviews require a configured API key and a successful external model request.
+- **No automated proof verification.** Other users evaluate evidence; the application does not independently establish that submitted evidence is genuine.
+- **No group chat or automatic matching.** Users organize accountability through the supported group creation and joining flows.
+- **No third-party integrations.** BetterSelf does not automatically import data from calendars, fitness trackers, or other goal-tracking services.
+
+These limitations define the current implementation boundary and possible directions for future development.
+
+---
+
+## Future Work
+
+Potential future extensions include:
+
+- More reliable distributed coordination and resumable deletion workflows.
+- Real-time group notifications.
+- More flexible recurring commitment schedules.
+- Additional progress analytics and visualizations.
+- Improved image lifecycle management.
+- Optional calendar and third-party integrations.
+- User-customizable themes.
+- More sophisticated AI-assisted strategy adaptation.
+
+These are potential extensions, not claims about the current implementation.
+
+---
+
+## Project Documentation
+
+- [P1 Design](docs/design.md)
+- [P3 Visual Design Study](docs/BetterSelf_Visual_Design_Study_Beta_UI_Updated.pdf)
+- [P3 Saved Test Results](test-results/p3-tests.txt)
+- [P3 Beta Demo](https://drive.google.com/file/d/1B2yCBv189ynPdFAyojnRX8xBB8lIsn21/view?usp=sharing)
+- [Live BetterSelf Application](https://betterself.mit-sdg.dev/)
+- [Design Notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md)
+
+The design notebook is located in the private individual course repository and is available to authorized course staff.
+
+---
+
+**BetterSelf — Big goals. Small steps. Real progress.**
