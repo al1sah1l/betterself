@@ -603,6 +603,7 @@ These are potential extensions, not claims about the current implementation.
 - [P3 Visual Design Study](docs/BetterSelf_Visual_Design_Study_Beta_UI_Updated.pdf)
 - [P3 Saved Test Results](test-results/p3-tests.txt)
 - [P3 Beta Demo](https://drive.google.com/file/d/1B2yCBv189ynPdFAyojnRX8xBB8lIsn21/view?usp=sharing)
+- [P4 Demo](https://drive.google.com/file/d/1jVB_dTiKvpNaoKiHwtbEJezJbWJgbtfX/view?usp=sharing)
 - [Live BetterSelf Application](https://betterself.mit-sdg.dev/)
 - [Design Notebook](https://github.com/al1sah1l/6.1040-fall26/blob/main/reflections/design-notebook.md)
 
